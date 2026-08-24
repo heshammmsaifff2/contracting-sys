@@ -11,13 +11,21 @@ import { ValidationError } from "../../../shared/errors/domain-error";
 import { err, ok, type Result } from "../../../shared/result";
 import { Code } from "../../../shared/value-objects/code";
 
-/** تصنيف الموظف: إداري / مهندس / مشرف — يحكم من يراسل من في وحدة المراسلات. */
-export type EmployeeType = "admin" | "engineer" | "supervisor";
+/**
+ * تصنيف الموظف — يحكم أوزان التقييم ومن يراسل من في وحدة المراسلات.
+ *
+ * **لا يمنح صلاحيات.** الصلاحيات كلها من الأدوار (`user_roles`)، وخلط
+ * الاثنين مصدر لبس متكرّر: تغيير التصنيف لا يفتح شاشة ولا يغلقها.
+ *
+ * `worker` أُضيف في مرحلة شؤون الموظفين لعمّال اليومية.
+ */
+export type EmployeeType = "admin" | "engineer" | "supervisor" | "worker";
 
 export const EMPLOYEE_TYPES: readonly EmployeeType[] = [
   "admin",
   "engineer",
   "supervisor",
+  "worker",
 ];
 
 export interface ProfileProps extends AuditableEntityProps {

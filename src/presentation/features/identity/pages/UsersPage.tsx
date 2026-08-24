@@ -11,13 +11,8 @@ import { errorMessage } from "@presentation/shared/lib/query";
 import { useProfiles, useSetProfileActive } from "../hooks/useIdentity";
 import { UserFormModal } from "../components/UserFormModal";
 import { UserRolesModal } from "../components/UserRolesModal";
+import { employeeTypeLabel } from "@presentation/shared/lib/employee-type";
 import { t } from "@i18n/index";
-
-const TYPE_LABELS: Record<string, string> = {
-  admin: t.users.typeAdmin,
-  engineer: t.users.typeEngineer,
-  supervisor: t.users.typeSupervisor,
-};
 
 export function UsersPage() {
   const profiles = useProfiles();
@@ -52,7 +47,9 @@ export function UsersPage() {
     {
       key: "type",
       header: t.users.type,
-      render: (row) => <Badge tone="neutral">{TYPE_LABELS[row.employeeType]}</Badge>,
+      render: (row) => (
+        <Badge tone="neutral">{employeeTypeLabel(row.employeeType)}</Badge>
+      ),
     },
     {
       key: "roles",

@@ -68,6 +68,48 @@
     outline: 2px solid var(--color-brand-500);
     outline-offset: 2px;
   }
+
+  /**
+   * شريط تمرير رفيع بلون الحدود.
+   *
+   * القاعدتان متبادلتان لا مجتمعتان: Chrome الحديث يدعم `scrollbar-width`
+   * المعياري و**يُغلّبه** على `::-webkit-scrollbar`، فلو كُتب الاثنان معًا
+   * لأُهملت القواعد المخصّصة وعاد الشريط إلى ١٠px. لذلك يُقصَر المعياري
+   * على المتصفّحات التي لا تعرف `::-webkit-scrollbar` أصلًا — أي Firefox.
+   *
+   * والشريط يبقى **ظاهرًا دائمًا** لا عند التمرير فقط: القائمة الجانبية فيها
+   * أربعون شاشة، وإخفاء الدليل الوحيد على وجود مزيد تحت الحافة هو أصل
+   * المشكلة التي حُلّت للتوّ.
+   */
+  @supports not selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--color-border-strong) transparent;
+    }
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--color-border-strong);
+    border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-content-muted);
+  }
+
+  /* الزاوية بين الشريطين الأفقي والرأسي تظهر رمادية بلا هذا */
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -12,13 +12,8 @@ import { FormField } from "@presentation/shared/ui/FormField";
 import { Modal } from "@presentation/shared/ui/Modal";
 import { useCreateUser, useUpdateProfile } from "../hooks/useIdentity";
 import { errorMessage } from "@presentation/shared/lib/query";
+import { EMPLOYEE_TYPE_OPTIONS } from "@presentation/shared/lib/employee-type";
 import { t } from "@i18n/index";
-
-const EMPLOYEE_TYPE_OPTIONS = [
-  { value: "admin", label: t.users.typeAdmin },
-  { value: "engineer", label: t.users.typeEngineer },
-  { value: "supervisor", label: t.users.typeSupervisor },
-] as const;
 
 export interface UserFormModalProps {
   isOpen: boolean;
@@ -112,7 +107,7 @@ export function UserFormModal({ isOpen, onClose, profile }: UserFormModalProps) 
           )}
         </FormField>
 
-        <FormField label={t.users.type} required>
+        <FormField label={t.users.type} hint={t.users.typeHint} required>
           {(id) => (
             <Select
               id={id}
