@@ -9,8 +9,12 @@ import { EmptyState } from "@presentation/shared/ui/EmptyState";
 import { t } from "@i18n/index";
 
 export interface ProtectedRouteProps {
-  /** الصلاحية المطلوبة — يكفي امتلاك إحداها إن مُرّرت عدّة. */
-  permission?: string | readonly string[];
+  /**
+   * الصلاحية المطلوبة — يكفي امتلاك إحداها إن مُرّرت عدّة.
+   * `undefined` تعني شاشة متاحة لكل مستخدم نشط، وهي القيمة التي تعيدها
+   * `screenPermission` لشاشات مثل الخدمة الذاتية.
+   */
+  permission?: string | readonly string[] | undefined;
 }
 
 export function ProtectedRoute({ permission }: ProtectedRouteProps) {

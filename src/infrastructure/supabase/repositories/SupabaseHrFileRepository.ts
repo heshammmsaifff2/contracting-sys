@@ -175,8 +175,11 @@ export class SupabaseWorkerFileRepository implements IWorkerFileRepository {
       const { data, error } = await this.client
         .from("salary_changes")
         .select(
+          // `salary_changes` له مفتاحان إلى `profiles` (العامل، ومن اعتمد
+          // التعديل) — المقصود هنا العامل، ويجب أن يُسمّى صراحةً
           `id, worker_id, old_base, new_base, old_daily, new_daily,
-           effective_from, reason, created_at, profiles!inner(full_name)`,
+           effective_from, reason, created_at,
+           profiles!salary_changes_worker_id_fkey(full_name)`,
         )
         .eq("worker_id", workerId)
         .order("created_at", { ascending: false })

@@ -3,7 +3,7 @@ import { NavLink } from "react-router-dom";
 import { Search, X } from "lucide-react";
 import { cn } from "../lib/cn";
 import { Badge } from "../ui/Badge";
-import { NAV_GROUPS, type NavItem } from "./nav-items";
+import { NAV_SECTIONS, type NavItem } from "./nav-items";
 import { APP_NAME, CURRENT_PHASE } from "@config/app";
 import { useAuth } from "@presentation/app/providers/auth-context";
 import { t } from "@i18n/index";
@@ -30,7 +30,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
   const groups = useMemo(() => {
     const needle = query.trim();
 
-    return NAV_GROUPS.map((group) => ({
+    return NAV_SECTIONS.map((group) => ({
       ...group,
       items: group.items.filter((item) => {
         if (item.permission !== undefined) {

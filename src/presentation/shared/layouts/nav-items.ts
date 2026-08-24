@@ -68,7 +68,7 @@ export interface NavGroup {
  * التقسيم هنا يتبع وحدات المواصفات نفسها لا ترتيب المراحل، لأن المستخدم
  * يبحث عن «اليوميات» تحت «شؤون الموظفين» لا تحت «المرحلة السابعة».
  */
-export const NAV_GROUPS: readonly NavGroup[] = [
+export const NAV_GROUPS = [
   {
     key: "general",
     label: t.navGroups.general,
@@ -382,7 +382,15 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     key: "system",
     label: t.navGroups.system,
     items: [
-      { to: "/settings", label: t.nav.settings, icon: Settings, phase: 1 },
+      {
+        // الإعدادات تكشف نسب الضريبة وحسابات الترحيل وعتبات الهدر —
+        // ليست شاشة اطّلاع عامّة
+        to: "/settings",
+        label: t.nav.settings,
+        icon: Settings,
+        phase: 1,
+        permission: "settings.manage",
+      },
       {
         to: "/setup",
         label: t.nav.setupCheck,
@@ -392,7 +400,33 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       },
     ],
   },
-];
+] as const satisfies readonly NavGroup[];
+
+/**
+ * المجموعات بنوع موسَّع — هذا ما تستهلكه الواجهة.
+ * `NAV_GROUPS` نفسها `as const` لتُشتقّ منها أنواع المسارات الحرفية، وذلك
+ * يجعل العناصر بلا صلاحية تفقد الخاصية أصلًا فلا تُقرأ من الاتحاد.
+ */
+export const NAV_SECTIONS: readonly NavGroup[] = NAV_GROUPS;
 
 /** القائمة مسطّحة — لمن يحتاج البحث في كل الشاشات بلا تجميع. */
-export const NAV_ITEMS: readonly NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
+export const NAV_ITEMS: readonly NavItem[] = NAV_SECTIONS.flatMap((g) => g.items);
+
+/** مسارات الشاشات المعروفة — نوع حرفي يمنع الأخطاء المطبعية عند الحراسة. */
+export type ScreenPath = (typeof NAV_GROUPS)[number]["items"][number]["to"];
+
+/**
+ * صلاحية الشاشة — **المصدر الوحيد** الذي يستعمله الشريط الجانبي وحارس
+ * المسار معًا.
+ *
+ * قبل ذلك كانت الصلاحية مكتوبة مرّتين: مرّة في عنصر القائمة ومرّة في
+ * `routes.tsx`. ولو اختلفتا لظهرت شاشة في القائمة ثم رفضت فتحها، أو —
+ * وهو الأسوأ — لاختفت من القائمة وبقي رابطها مفتوحًا لمن يعرفه.
+ * التوحيد هنا يجعل ذلك الاختلاف مستحيلًا، والنوع الحرفي يجعل المسار
+ * الخاطئ خطأ ترجمة لا مفاجأة وقت التشغيل.
+ */
+export function screenPermission(
+  path: ScreenPath,
+): string | readonly string[] | undefined {
+  return NAV_ITEMS.find((item) => item.to === path)?.permission;
+}

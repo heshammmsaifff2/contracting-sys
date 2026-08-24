@@ -159,9 +159,19 @@ export class SupabaseWorkflowDefinitionRepository implements IWorkflowDefinition
       const { data, error } = await this.client
         .from("duration_change_log")
         .select(
+          // كل تضمين هنا مُسمّى بمفتاحه الأجنبي، لأن بين هذه الجداول أكثر من
+          // علاقة واحدة فيلتبس التضمين المجرّد على PostgREST فيردّه بخطأ:
+          //   • `transaction_step_instances` → `profiles` مرّتين
+          //     (المسؤول، ومن تُعرض له ملاحظة المدير)
+          //   • `transaction_step_instances` ⇄ `transactions` في الاتجاهين
+          //     (المعاملة الأمّ، والمرحلة الجارية للمعاملة)
           `id, step_instance_id, old_minutes, new_minutes, reason, changed_at,
-           profiles(full_name),
-           transaction_step_instances(name, transactions(no), profiles(full_name))`,
+           profiles!duration_change_log_changed_by_fkey(full_name),
+           transaction_step_instances(
+             name,
+             transactions!transaction_step_instances_transaction_id_fkey(no),
+             profiles!transaction_step_instances_assignee_id_fkey(full_name)
+           )`,
         )
         .order("changed_at", { ascending: false })
         .limit(200)
