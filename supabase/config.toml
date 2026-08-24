@@ -1,0 +1,17 @@
+project_id = "contracting-sys"
+
+[functions.sign-cloudinary-upload]
+verify_jwt = true
+
+[functions.delete-cloudinary-asset]
+verify_jwt = true
+
+[functions.admin-create-user]
+verify_jwt = true
+
+[functions.post-accounting-entry]
+verify_jwt = true
+
+# مُشغِّلها جدول زمني لا مستخدم، فالحماية بسرّ مشترك (CRON_SECRET) لا بـ JWT
+[functions.run-auto-letters]
+verify_jwt = false
