@@ -18,8 +18,5 @@ export const supabase: AppSupabaseClient = createClient<Database>(
       autoRefreshToken: true,
       detectSessionInUrl: true,
     },
-    global: {
-      headers: { "x-application-name": "contracting-sys" },
-    },
   },
 );

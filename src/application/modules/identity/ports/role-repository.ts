@@ -10,6 +10,18 @@ export interface IRoleRepository {
     roleId: string,
     permissionIds: readonly string[],
   ): Promise<Result<void, DomainError>>;
+  createRole(role: {
+    key: string;
+    name: string;
+    description: string | null;
+  }): Promise<Result<RoleDto, DomainError>>;
+  updateRole(role: {
+    id: string;
+    name: string;
+    description: string | null;
+  }): Promise<Result<RoleDto, DomainError>>;
+  deleteRole(id: string): Promise<Result<void, DomainError>>;
+  getUsersCountForRole(roleId: string): Promise<Result<number, DomainError>>;
   assignRoleToUser(userId: string, roleId: string): Promise<Result<void, DomainError>>;
   removeRoleFromUser(
     userId: string,

@@ -2,6 +2,7 @@
  * عميل موحّد لاستدعاء Supabase Edge Functions.
  * يحوّل كل الأخطاء إلى DomainError عند الحدود، فلا تتسرّب أنواع Supabase للأعلى.
  */
+import { FunctionsHttpError } from "@supabase/supabase-js";
 import type { DomainError } from "@core/shared/errors/domain-error";
 import { InfrastructureError, toDomainError } from "@core/shared/errors/domain-error";
 import { err, ok, type Result } from "@core/shared/result";
@@ -27,10 +28,35 @@ export class EdgeFnClient {
       );
 
       if (error) {
+        let serverMessage: string | null = null;
+        if (error instanceof FunctionsHttpError && error.context) {
+          try {
+            const body = await error.context.json();
+            serverMessage =
+              body?.error?.message ??
+              (typeof body?.error === "string" ? body.error : null) ??
+              body?.message ??
+              null;
+          } catch {
+            try {
+              const text = await error.context.text();
+              if (text && text.trim().length > 0) {
+                serverMessage = text;
+              }
+            } catch {
+              // ignore
+            }
+          }
+        }
+
+        const message =
+          serverMessage || (error.message && error.message !== "Edge Function returned a non-2xx status code" ? error.message : `فشل استدعاء الدالة ${name}`);
+
         return err(
-          new InfrastructureError(`فشل استدعاء الدالة ${name}`, {
+          new InfrastructureError(message, {
             fn: name,
             cause: error.message,
+            serverMessage,
           }),
         );
       }

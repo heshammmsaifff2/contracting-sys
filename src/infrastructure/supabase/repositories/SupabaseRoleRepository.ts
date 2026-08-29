@@ -104,6 +104,103 @@ export class SupabaseRoleRepository implements IRoleRepository {
     }
   }
 
+  async createRole(role: {
+    key: string;
+    name: string;
+    description: string | null;
+  }): Promise<Result<RoleDto, DomainError>> {
+    try {
+      const { data, error } = await this.client
+        .from("roles")
+        .insert({
+          key: role.key,
+          name: role.name,
+          description: role.description,
+          is_system: false,
+        })
+        .select("id, key, name, description, is_system")
+        .single();
+
+      if (error) return err(toDomainDbError(error, { entity: "الأدوار" }));
+
+      return ok({
+        id: data.id,
+        key: data.key,
+        name: data.name,
+        description: data.description,
+        isSystem: data.is_system,
+        permissionKeys: [],
+      });
+    } catch (e) {
+      return err(toDomainError(e, "تعذّر إضافة الدور"));
+    }
+  }
+
+  async updateRole(role: {
+    id: string;
+    name: string;
+    description: string | null;
+  }): Promise<Result<RoleDto, DomainError>> {
+    try {
+      const { data, error } = await this.client
+        .from("roles")
+        .update({
+          name: role.name,
+          description: role.description,
+        })
+        .eq("id", role.id)
+        .select(
+          "id, key, name, description, is_system, role_permissions(permissions(key))",
+        )
+        .single();
+
+      if (error) return err(toDomainDbError(error, { entity: "الأدوار", id: role.id }));
+
+      const row = data as unknown as RoleWithPermissionsRow;
+      return ok({
+        id: row.id,
+        key: row.key,
+        name: row.name,
+        description: row.description,
+        isSystem: row.is_system,
+        permissionKeys: (row.role_permissions ?? [])
+          .map((link) => link.permissions?.key)
+          .filter((key): key is string => key !== undefined),
+      });
+    } catch (e) {
+      return err(toDomainError(e, "تعذّر تعديل الدور"));
+    }
+  }
+
+  async deleteRole(id: string): Promise<Result<void, DomainError>> {
+    try {
+      const { error } = await this.client
+        .from("roles")
+        .delete()
+        .eq("id", id)
+        .eq("is_system", false);
+
+      if (error) return err(toDomainDbError(error, { entity: "الأدوار", id }));
+      return okVoid();
+    } catch (e) {
+      return err(toDomainError(e, "تعذّر حذف الدور"));
+    }
+  }
+
+  async getUsersCountForRole(roleId: string): Promise<Result<number, DomainError>> {
+    try {
+      const { count, error } = await this.client
+        .from("user_roles")
+        .select("*", { count: "exact", head: true })
+        .eq("role_id", roleId);
+
+      if (error) return err(toDomainDbError(error, { entity: "مستخدمو الدور", id: roleId }));
+      return ok(count ?? 0);
+    } catch (e) {
+      return err(toDomainError(e, "تعذّر حساب عدد مستخدمي الدور"));
+    }
+  }
+
   async assignRoleToUser(
     userId: string,
     roleId: string,

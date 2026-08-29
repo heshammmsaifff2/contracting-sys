@@ -23,6 +23,9 @@ import { ListProfiles } from "@application/modules/identity/use-cases/ListProfil
 import { UpdateProfile } from "@application/modules/identity/use-cases/UpdateProfile";
 import { SetProfileActive } from "@application/modules/identity/use-cases/SetProfileActive";
 import { CreateUser } from "@application/modules/identity/use-cases/CreateUser";
+import { CreateRole } from "@application/modules/identity/use-cases/CreateRole";
+import { UpdateRole } from "@application/modules/identity/use-cases/UpdateRole";
+import { DeleteRole } from "@application/modules/identity/use-cases/DeleteRole";
 import { ListRoles } from "@application/modules/identity/use-cases/ListRoles";
 import { ListPermissions } from "@application/modules/identity/use-cases/ListPermissions";
 import { SetRolePermissions } from "@application/modules/identity/use-cases/SetRolePermissions";
@@ -325,6 +328,9 @@ export interface Container {
     readonly updateProfile: UpdateProfile;
     readonly setProfileActive: SetProfileActive;
     readonly createUser: CreateUser;
+    readonly createRole: CreateRole;
+    readonly updateRole: UpdateRole;
+    readonly deleteRole: DeleteRole;
     readonly listRoles: ListRoles;
     readonly listPermissions: ListPermissions;
     readonly setRolePermissions: SetRolePermissions;
@@ -616,6 +622,9 @@ export function createContainer(overrides: ContainerOverrides = {}): Container {
       updateProfile: new UpdateProfile(profileRepository),
       setProfileActive: new SetProfileActive(profileRepository),
       createUser: new CreateUser(userAdminService),
+      createRole: new CreateRole(roleRepository),
+      updateRole: new UpdateRole(roleRepository),
+      deleteRole: new DeleteRole(roleRepository),
       listRoles: new ListRoles(roleRepository),
       listPermissions: new ListPermissions(roleRepository),
       setRolePermissions: new SetRolePermissions(roleRepository),

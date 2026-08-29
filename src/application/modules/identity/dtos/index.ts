@@ -47,3 +47,21 @@ export interface CreateUserInput {
   code?: string | null;
   roleKeys?: readonly string[];
 }
+
+export interface CreateRoleInput {
+  key: string;
+  name: string;
+  description?: string | null;
+  permissionIds?: readonly string[];
+}
+
+export interface UpdateRoleInput {
+  id: string;
+  name: string;
+  description?: string | null;
+  permissionIds?: readonly string[];
+}
+
+export interface DeleteRoleInput {
+  id: string;
+}

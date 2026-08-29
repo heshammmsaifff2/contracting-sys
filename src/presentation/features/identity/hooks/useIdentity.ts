@@ -5,8 +5,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUseCases } from "@presentation/app/providers/di-context";
 import { unwrap } from "@presentation/shared/lib/query";
 import type {
+  CreateRoleInput,
   CreateUserInput,
+  DeleteRoleInput,
   UpdateProfileInput,
+  UpdateRoleInput,
 } from "@application/modules/identity/dtos";
 
 export const PROFILES_KEY = ["profiles"] as const;
@@ -34,6 +37,48 @@ export function usePermissionsCatalog() {
   return useQuery({
     queryKey: PERMISSIONS_KEY,
     queryFn: async () => unwrap(await listPermissions.execute()),
+  });
+}
+
+export function useCreateRole() {
+  const { createRole } = useUseCases();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: CreateRoleInput) =>
+      unwrap(await createRole.execute(input)),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ROLES_KEY });
+      queryClient.invalidateQueries({ queryKey: PERMISSIONS_KEY });
+    },
+  });
+}
+
+export function useUpdateRole() {
+  const { updateRole } = useUseCases();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: UpdateRoleInput) =>
+      unwrap(await updateRole.execute(input)),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ROLES_KEY });
+      queryClient.invalidateQueries({ queryKey: PERMISSIONS_KEY });
+    },
+  });
+}
+
+export function useDeleteRole() {
+  const { deleteRole } = useUseCases();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: DeleteRoleInput) =>
+      unwrap(await deleteRole.execute(input)),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ROLES_KEY });
+      queryClient.invalidateQueries({ queryKey: PROFILES_KEY });
+    },
   });
 }
 
