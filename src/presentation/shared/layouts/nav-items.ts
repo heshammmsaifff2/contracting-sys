@@ -37,7 +37,7 @@ import {
   UserCog,
   Settings,
   PieChart,
-  Stethoscope,
+  // Stethoscope,
 } from "lucide-react";
 import { t } from "@i18n/index";
 
@@ -391,13 +391,13 @@ export const NAV_GROUPS = [
         phase: 1,
         permission: "settings.manage",
       },
-      {
-        to: "/setup",
-        label: t.nav.setupCheck,
-        icon: Stethoscope,
-        phase: 0,
-        permission: "settings.manage",
-      },
+      // {
+      //   to: "/setup",
+      //   label: t.nav.setupCheck,
+      //   icon: Stethoscope,
+      //   phase: 0,
+      //   permission: "settings.manage",
+      // },
     ],
   },
 ] as const satisfies readonly NavGroup[];

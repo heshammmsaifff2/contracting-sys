@@ -8,7 +8,7 @@ import {
   ProjectsPage,
   SettingsPage,
   DashboardPage,
-  SetupCheckPage,
+  // SetupCheckPage,
   ItemsPage,
   BoqPage,
   AccountsPage,
@@ -66,11 +66,11 @@ export const routeTree = [
         element: <AppShell />,
         children: [
           { index: true, element: <DashboardPage /> },
-          {
-            // فحص التأسيس أداة تشخيص لا شاشة عمل — خلف صلاحية الإعدادات
-            element: <ProtectedRoute permission={screenPermission("/setup")} />,
-            children: [{ path: "setup", element: <SetupCheckPage /> }],
-          },
+          // {
+          //   // فحص التأسيس أداة تشخيص لا شاشة عمل — خلف صلاحية الإعدادات
+          //   element: <ProtectedRoute permission={screenPermission("/setup")} />,
+          //   children: [{ path: "setup", element: <SetupCheckPage /> }],
+          // },
           { path: "projects", element: <ProjectsPage /> },
           {
             element: <ProtectedRoute permission={screenPermission("/settings")} />,
