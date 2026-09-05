@@ -223,8 +223,8 @@ export class SupabaseReportRepository implements IReportRepository {
           transactionType: row.transaction_type ?? "",
           subject: row.subject ?? "",
           projectName: row.project_name ?? "",
-          stepName: row.step_name ?? "",
-          orderNo: Number(row.order_no ?? 0),
+          stageName: row.stage_name ?? "",
+          seq: Number(row.seq ?? 0),
           assigneeName: row.assignee_name ?? "",
           oldMinutes: numberOrNull(row.old_minutes),
           newMinutes: Number(row.new_minutes ?? 0),
@@ -257,14 +257,14 @@ export class SupabaseReportRepository implements IReportRepository {
 
       return ok(
         (data ?? []).map((row) => ({
-          stepInstanceId: row.step_instance_id ?? "",
+          assignmentId: row.assignment_id ?? "",
           transactionId: row.transaction_id ?? "",
           transactionNo: Number(row.transaction_no ?? 0),
           transactionType: row.transaction_type ?? "",
           subject: row.subject ?? "",
           projectName: row.project_name ?? "",
-          stepName: row.step_name ?? "",
-          orderNo: Number(row.order_no ?? 0),
+          stageName: row.stage_name ?? "",
+          seq: Number(row.seq ?? 0),
           assigneeId: row.assignee_id,
           assigneeName: row.assignee_name ?? "",
           allocatedMinutes: Number(row.allocated_minutes ?? 0),

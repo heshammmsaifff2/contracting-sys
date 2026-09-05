@@ -5,15 +5,21 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUseCases } from "@presentation/app/providers/di-context";
 import { unwrap } from "@presentation/shared/lib/query";
+import type { PublishCandidateStage } from "@core/modules/workflow/entities/WorkflowGovernance";
 import type {
-  CompleteStepDto,
+  CompleteAssignmentDto,
   InboxFilter,
+  SaveActionRouteDto,
+  SaveWorkflowActionDto,
   SaveEvaluationScoreDto,
   SaveHolidayDto,
+  SaveStagePositionsDto,
+  SaveStageRequirementDto,
   SaveWorkflowDefinitionDto,
-  SaveWorkflowStepDto,
+  SaveStageParticipantDto,
+  SaveWorkflowStageDto,
   SaveWorkScheduleDto,
-  SetStepDurationDto,
+  SetAssignmentDurationDto,
   StartTransactionDto,
   TransactionDto,
 } from "@application/modules/workflow/dtos";
@@ -24,6 +30,8 @@ export const WORK_SCHEDULES_KEY = ["work-schedules"] as const;
 export const HOLIDAYS_KEY = ["holidays"] as const;
 export const EVALUATION_KEY = ["evaluation-summary"] as const;
 export const DURATION_CHANGES_KEY = ["duration-changes"] as const;
+export const AVAILABLE_ACTIONS_KEY = ["available-actions"] as const;
+export const TIMELINE_KEY = ["transaction-timeline"] as const;
 
 export const transactionKey = (id: string) => ["transaction", id] as const;
 
@@ -52,6 +60,38 @@ export function useTransaction(id: string | null) {
   });
 }
 
+/** الأزرار المتاحة الآن — الواجهة تعرضها بدل زرّ «إنجاز» واحد. */
+export function useAvailableActions(filter: {
+  transactionId?: string;
+  mineOnly?: boolean;
+}) {
+  const { listAvailableActions } = useUseCases();
+
+  return useQuery({
+    queryKey: [
+      ...AVAILABLE_ACTIONS_KEY,
+      filter.transactionId ?? "",
+      filter.mineOnly ?? false,
+    ],
+    queryFn: async () => unwrap(await listAvailableActions.execute(filter)),
+    refetchInterval: COUNTDOWN_REFRESH_MS,
+    placeholderData: (previous) => previous,
+  });
+}
+
+export function useTransactionTimeline(transactionId: string | null) {
+  const { getTransactionTimeline } = useUseCases();
+
+  return useQuery({
+    queryKey: [...TIMELINE_KEY, transactionId ?? ""],
+    queryFn: async () =>
+      unwrap(
+        await getTransactionTimeline.execute({ transactionId: transactionId ?? "" }),
+      ),
+    enabled: transactionId !== null,
+  });
+}
+
 export function useTransactionSearch(query: string) {
   const { searchTransactions } = useUseCases();
 
@@ -74,29 +114,49 @@ export function useStartTransaction() {
   });
 }
 
-export function useCompleteStep() {
-  const { completeStep } = useUseCases();
+/**
+ * إنجاز تكليف واحد. لا يعني إغلاق المرحلة بالضرورة: تحت سياسة «الكل»
+ * تبقى مفتوحة حتى ينجز بقيّة المشاركين.
+ */
+export function useCompleteAssignment() {
+  const { completeAssignment } = useUseCases();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: CompleteStepDto) =>
-      unwrap(await completeStep.execute(input)),
+    mutationFn: async (input: CompleteAssignmentDto) =>
+      unwrap(await completeAssignment.execute(input)),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: INBOX_KEY });
       await queryClient.invalidateQueries({ queryKey: ["transaction"] });
+      await queryClient.invalidateQueries({ queryKey: AVAILABLE_ACTIONS_KEY });
+      await queryClient.invalidateQueries({ queryKey: TIMELINE_KEY });
       // الدرجة الآلية تغيّر تقارير التقييم
       await queryClient.invalidateQueries({ queryKey: EVALUATION_KEY });
     },
   });
 }
 
-export function useSetStepDuration() {
-  const { setStepDuration } = useUseCases();
+export function useReceiveAssignment() {
+  const { receiveAssignment } = useUseCases();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: SetStepDurationDto) =>
-      unwrap(await setStepDuration.execute(input)),
+    mutationFn: async (assignmentId: string) =>
+      unwrap(await receiveAssignment.execute({ assignmentId })),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: INBOX_KEY });
+      await queryClient.invalidateQueries({ queryKey: ["transaction"] });
+    },
+  });
+}
+
+export function useSetAssignmentDuration() {
+  const { setAssignmentDuration } = useUseCases();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: SetAssignmentDurationDto) =>
+      unwrap(await setAssignmentDuration.execute(input)),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: INBOX_KEY });
       await queryClient.invalidateQueries({ queryKey: ["transaction"] });
@@ -158,24 +218,171 @@ export function useSaveWorkflowDefinition() {
   });
 }
 
-export function useSaveWorkflowStep() {
-  const { saveWorkflowStep } = useUseCases();
+export function useSaveWorkflowStage() {
+  const { saveWorkflowStage } = useUseCases();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: SaveWorkflowStepDto) =>
-      unwrap(await saveWorkflowStep.execute(input)),
+    mutationFn: async (input: SaveWorkflowStageDto) =>
+      unwrap(await saveWorkflowStage.execute(input)),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: WORKFLOW_DEFINITIONS_KEY }),
   });
 }
 
-export function useRemoveWorkflowStep() {
-  const { removeWorkflowStep } = useUseCases();
+/**
+ * حفظ مواضع العُقَد بعد السحب.
+ *
+ * لا `invalidateQueries`: الموضع في يد المحرِّر أصلًا، وإعادة الجلب بعد كل
+ * سحبة تُعيد رسم اللوحة فتقفز العقدة تحت المؤشّر.
+ */
+export function useSaveStagePositions() {
+  const { saveStagePositions } = useUseCases();
+
+  return useMutation({
+    mutationFn: async (input: SaveStagePositionsDto) =>
+      unwrap(await saveStagePositions.execute(input)),
+  });
+}
+
+/** شرط جاهزية على مرحلة [المرحلة ٠٧] — يُقاس قبل التقدّم لا بعده. */
+export function useSaveStageRequirement() {
+  const { saveStageRequirement } = useUseCases();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (id: string) => unwrap(await removeWorkflowStep.execute({ id })),
+    mutationFn: async (input: SaveStageRequirementDto) =>
+      unwrap(await saveStageRequirement.execute(input)),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: WORKFLOW_DEFINITIONS_KEY }),
+  });
+}
+
+export function useRemoveStageRequirement() {
+  const { removeStageRequirement } = useUseCases();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) =>
+      unwrap(await removeStageRequirement.execute({ id })),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: WORKFLOW_DEFINITIONS_KEY }),
+  });
+}
+
+/** نسخة مسودّة — المنشور مجمَّد لأن معاملات تسير عليه. */
+export function useCreateWorkflowDraft() {
+  const { createWorkflowDraft } = useUseCases();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (definitionId: string) =>
+      unwrap(await createWorkflowDraft.execute({ definitionId })),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: WORKFLOW_DEFINITIONS_KEY }),
+  });
+}
+
+/**
+ * النشر. يُبطل صندوق الوارد أيضًا: المعاملات الجديدة تبدأ من الإصدار الجديد
+ * وقد تغيّرت مراحلها.
+ */
+export function usePublishWorkflowVersion() {
+  const { publishWorkflowVersion } = useUseCases();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      definitionId: string;
+      stages: readonly PublishCandidateStage[];
+    }) => unwrap(await publishWorkflowVersion.execute(input)),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: WORKFLOW_DEFINITIONS_KEY });
+      await queryClient.invalidateQueries({ queryKey: INBOX_KEY });
+    },
+  });
+}
+
+export function useRemoveWorkflowStage() {
+  const { removeWorkflowStage } = useUseCases();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => unwrap(await removeWorkflowStage.execute({ id })),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: WORKFLOW_DEFINITIONS_KEY }),
+  });
+}
+
+/** إضافة مشارك ثانٍ هي ما يجعل المرحلة تقف عند أكثر من موظف. */
+export function useSaveStageParticipant() {
+  const { saveStageParticipant } = useUseCases();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: SaveStageParticipantDto) =>
+      unwrap(await saveStageParticipant.execute(input)),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: WORKFLOW_DEFINITIONS_KEY }),
+  });
+}
+
+export function useRemoveStageParticipant() {
+  const { removeStageParticipant } = useUseCases();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) =>
+      unwrap(await removeStageParticipant.execute({ id })),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: WORKFLOW_DEFINITIONS_KEY }),
+  });
+}
+
+/** أزرار المرحلة في المحرِّر. */
+export function useSaveWorkflowAction() {
+  const { saveWorkflowAction } = useUseCases();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: SaveWorkflowActionDto) =>
+      unwrap(await saveWorkflowAction.execute(input)),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: WORKFLOW_DEFINITIONS_KEY }),
+  });
+}
+
+export function useRemoveWorkflowAction() {
+  const { removeWorkflowAction } = useUseCases();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) =>
+      unwrap(await removeWorkflowAction.execute({ id })),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: WORKFLOW_DEFINITIONS_KEY }),
+  });
+}
+
+/** وجهة مشروطة للزرّ — هنا يقع التفريع. */
+export function useSaveActionRoute() {
+  const { saveActionRoute } = useUseCases();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: SaveActionRouteDto) =>
+      unwrap(await saveActionRoute.execute(input)),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: WORKFLOW_DEFINITIONS_KEY }),
+  });
+}
+
+export function useRemoveActionRoute() {
+  const { removeActionRoute } = useUseCases();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => unwrap(await removeActionRoute.execute({ id })),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: WORKFLOW_DEFINITIONS_KEY }),
   });

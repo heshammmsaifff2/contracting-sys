@@ -50,7 +50,11 @@ export class EdgeFnClient {
         }
 
         const message =
-          serverMessage || (error.message && error.message !== "Edge Function returned a non-2xx status code" ? error.message : `فشل استدعاء الدالة ${name}`);
+          serverMessage ||
+          (error.message &&
+          error.message !== "Edge Function returned a non-2xx status code"
+            ? error.message
+            : `فشل استدعاء الدالة ${name}`);
 
         return err(
           new InfrastructureError(message, {

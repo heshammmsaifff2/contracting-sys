@@ -201,7 +201,10 @@ export function RolesPage() {
             </div>
 
             {deleteError !== null && (
-              <p role="alert" className="text-danger bg-danger/10 rounded-lg p-3 text-sm">
+              <p
+                role="alert"
+                className="text-danger bg-danger/10 rounded-lg p-3 text-sm"
+              >
                 {deleteError}
               </p>
             )}

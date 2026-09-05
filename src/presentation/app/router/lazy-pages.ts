@@ -114,6 +114,24 @@ export const WorkflowAdminPage = lazy(() =>
     default: m.WorkflowAdminPage,
   })),
 );
+
+export const EvaluationRulesPage = lazy(() =>
+  import("@presentation/features/workflow/pages/EvaluationRulesPage").then((m) => ({
+    default: m.EvaluationRulesPage,
+  })),
+);
+
+export const ArchivePage = lazy(() =>
+  import("@presentation/features/workflow/pages/ArchivePage").then((m) => ({
+    default: m.ArchivePage,
+  })),
+);
+
+export const ScheduledTasksPage = lazy(() =>
+  import("@presentation/features/workflow/pages/ScheduledTasksPage").then((m) => ({
+    default: m.ScheduledTasksPage,
+  })),
+);
 export const WorkCalendarPage = lazy(() =>
   import("@presentation/features/workflow/pages/WorkCalendarPage").then((m) => ({
     default: m.WorkCalendarPage,

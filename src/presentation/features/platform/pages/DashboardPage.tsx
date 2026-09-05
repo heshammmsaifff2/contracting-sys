@@ -130,7 +130,7 @@ export function DashboardPage() {
               {[...overdue, ...nearDue, ...mine.filter((i) => i.color === "info")]
                 .slice(0, 6)
                 .map((item) => (
-                  <li key={item.stepInstanceId}>
+                  <li key={item.assignmentId}>
                     <Link
                       to={`/transactions/${item.transactionId}`}
                       className="hover:bg-surface-sunken flex items-center justify-between gap-3 px-5 py-3 transition-colors"
@@ -140,7 +140,7 @@ export function DashboardPage() {
                           {item.subject || item.transactionType}
                         </span>
                         <span className="text-content-muted truncate text-xs">
-                          {item.stepName}
+                          {item.stageName}
                           {item.projectName !== null ? ` · ${item.projectName}` : ""}
                         </span>
                       </span>

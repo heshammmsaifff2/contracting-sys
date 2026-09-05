@@ -4,15 +4,16 @@ import type { IRoleRepository } from "../ports/role-repository";
 import { CreateRole } from "./CreateRole";
 
 function makeRoleRepo() {
-  const createRole = vi.fn(async (role: { key: string; name: string; description: string | null }) =>
-    ok({
-      id: "r1",
-      key: role.key,
-      name: role.name,
-      description: role.description,
-      isSystem: false,
-      permissionKeys: [],
-    }),
+  const createRole = vi.fn(
+    async (role: { key: string; name: string; description: string | null }) =>
+      ok({
+        id: "r1",
+        key: role.key,
+        name: role.name,
+        description: role.description,
+        isSystem: false,
+        permissionKeys: [],
+      }),
   );
   const setRolePermissions = vi.fn(async () => okVoid());
 
@@ -20,7 +21,15 @@ function makeRoleRepo() {
     listRoles: async () => ok([]),
     listPermissions: async () => ok([]),
     createRole,
-    updateRole: async () => ok({ id: "r1", key: "k", name: "n", description: null, isSystem: false, permissionKeys: [] }),
+    updateRole: async () =>
+      ok({
+        id: "r1",
+        key: "k",
+        name: "n",
+        description: null,
+        isSystem: false,
+        permissionKeys: [],
+      }),
     deleteRole: async () => okVoid(),
     getUsersCountForRole: async () => ok(0),
     setRolePermissions,

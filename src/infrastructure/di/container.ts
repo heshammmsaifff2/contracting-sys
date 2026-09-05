@@ -105,19 +105,48 @@ import {
 import {
   ListInbox,
   GetTransaction,
+  ListAvailableActions,
+  GetTransactionTimeline,
   SearchTransactions,
   StartTransaction,
-  CompleteStep,
-  SetStepDuration,
+  CompleteAssignment,
+  ReceiveAssignment,
+  SetAssignmentDuration,
+  SetTransactionContext,
   CloseTransaction,
   CancelTransaction,
   ListDurationChanges,
 } from "@application/modules/workflow/use-cases/WorkflowUseCases";
 import {
+  ListEvaluationCategories,
+  ListCategoryScores,
+  ListEvaluationRules,
+  SaveEvaluationRule,
+  RemoveEvaluationRule,
+  PreviewEvaluationRules,
+  ApplyEvaluationRules,
+  RevokeEvaluationRule,
+  ListEvaluationPeriodReport,
+  TakeEvaluationSnapshot,
+  ClearEvaluationSnapshot,
+  ListEvaluationAudit,
+} from "@application/modules/workflow/use-cases/EvaluationUseCases";
+import {
   ListWorkflowDefinitions,
   SaveWorkflowDefinition,
-  SaveWorkflowStep,
-  RemoveWorkflowStep,
+  SaveWorkflowStage,
+  SaveStagePositions,
+  SaveStageRequirement,
+  RemoveStageRequirement,
+  CreateWorkflowDraft,
+  PublishWorkflowVersion,
+  RemoveWorkflowStage,
+  SaveStageParticipant,
+  RemoveStageParticipant,
+  SaveWorkflowAction,
+  RemoveWorkflowAction,
+  SaveActionRoute,
+  RemoveActionRoute,
   ListWorkSchedules,
   SaveWorkSchedule,
   RemoveWorkSchedule,
@@ -129,6 +158,33 @@ import {
   SaveEvaluationScore,
   SetCriterionWeight,
 } from "@application/modules/workflow/use-cases/WorkflowAdminUseCases";
+import {
+  ListScheduledTasks,
+  SaveScheduledTask,
+  RemoveScheduledTask,
+  RunScheduledTaskNow,
+  ListScheduledTaskRuns,
+  PreviewSchedule,
+} from "@application/modules/workflow/use-cases/SchedulerUseCases";
+import {
+  ListTransactionAttachments,
+  AddTransactionAttachment,
+  RemoveTransactionAttachment,
+} from "@application/modules/workflow/use-cases/AttachmentUseCases";
+import {
+  ListTransferTargets,
+  TransferAssignment,
+  SendAssignmentAlert,
+  ExtendAssignmentDeadline,
+  ForceCloseTransaction,
+  MentionInTransaction,
+  ClaimAssignment,
+  ReleaseAssignmentClaim,
+  ListArchiveQueue,
+  SubmitTransactionOriginal,
+  AcceptTransactionArchive,
+  RejectTransactionArchive,
+} from "@application/modules/workflow/use-cases/OperationsUseCases";
 
 import {
   ListFacilities,
@@ -280,6 +336,9 @@ import { SupabaseTransferNoteRepository } from "../supabase/repositories/Supabas
 import { SupabaseProcurementWorkflow } from "../supabase/SupabaseProcurementWorkflow";
 import { SupabaseInboxRepository } from "../supabase/repositories/SupabaseInboxRepository";
 import { SupabaseWorkflowDefinitionRepository } from "../supabase/repositories/SupabaseWorkflowDefinitionRepository";
+import { SupabaseSchedulerRepository } from "../supabase/repositories/SupabaseSchedulerRepository";
+import { SupabaseAttachmentRepository } from "../supabase/repositories/SupabaseAttachmentRepository";
+import { SupabaseOperationsRepository } from "../supabase/repositories/SupabaseOperationsRepository";
 import { SupabaseWorkCalendarRepository } from "../supabase/repositories/SupabaseWorkCalendarRepository";
 import { SupabaseEvaluationRepository } from "../supabase/repositories/SupabaseEvaluationRepository";
 import { SupabaseWorkflowEngine } from "../supabase/SupabaseWorkflowEngine";
@@ -397,17 +456,56 @@ export interface Container {
     // سير العمل والمراسلات
     readonly listInbox: ListInbox;
     readonly getTransaction: GetTransaction;
+    readonly listAvailableActions: ListAvailableActions;
+    readonly getTransactionTimeline: GetTransactionTimeline;
     readonly searchTransactions: SearchTransactions;
     readonly startTransaction: StartTransaction;
-    readonly completeStep: CompleteStep;
-    readonly setStepDuration: SetStepDuration;
+    readonly completeAssignment: CompleteAssignment;
+    readonly receiveAssignment: ReceiveAssignment;
+    readonly setAssignmentDuration: SetAssignmentDuration;
+    readonly setTransactionContext: SetTransactionContext;
     readonly closeTransaction: CloseTransaction;
     readonly cancelTransaction: CancelTransaction;
     readonly listDurationChanges: ListDurationChanges;
     readonly listWorkflowDefinitions: ListWorkflowDefinitions;
     readonly saveWorkflowDefinition: SaveWorkflowDefinition;
-    readonly saveWorkflowStep: SaveWorkflowStep;
-    readonly removeWorkflowStep: RemoveWorkflowStep;
+    readonly listTransferTargets: ListTransferTargets;
+    readonly transferAssignment: TransferAssignment;
+    readonly sendAssignmentAlert: SendAssignmentAlert;
+    readonly extendAssignmentDeadline: ExtendAssignmentDeadline;
+    readonly forceCloseTransaction: ForceCloseTransaction;
+    readonly mentionInTransaction: MentionInTransaction;
+    readonly claimAssignment: ClaimAssignment;
+    readonly releaseAssignmentClaim: ReleaseAssignmentClaim;
+    readonly listArchiveQueue: ListArchiveQueue;
+    readonly submitTransactionOriginal: SubmitTransactionOriginal;
+    readonly acceptTransactionArchive: AcceptTransactionArchive;
+    readonly rejectTransactionArchive: RejectTransactionArchive;
+
+    readonly listTransactionAttachments: ListTransactionAttachments;
+    readonly addTransactionAttachment: AddTransactionAttachment;
+    readonly removeTransactionAttachment: RemoveTransactionAttachment;
+
+    readonly listScheduledTasks: ListScheduledTasks;
+    readonly saveScheduledTask: SaveScheduledTask;
+    readonly removeScheduledTask: RemoveScheduledTask;
+    readonly runScheduledTaskNow: RunScheduledTaskNow;
+    readonly listScheduledTaskRuns: ListScheduledTaskRuns;
+    readonly previewSchedule: PreviewSchedule;
+
+    readonly saveWorkflowStage: SaveWorkflowStage;
+    readonly saveStagePositions: SaveStagePositions;
+    readonly saveStageRequirement: SaveStageRequirement;
+    readonly removeStageRequirement: RemoveStageRequirement;
+    readonly createWorkflowDraft: CreateWorkflowDraft;
+    readonly publishWorkflowVersion: PublishWorkflowVersion;
+    readonly removeWorkflowStage: RemoveWorkflowStage;
+    readonly saveStageParticipant: SaveStageParticipant;
+    readonly removeStageParticipant: RemoveStageParticipant;
+    readonly saveWorkflowAction: SaveWorkflowAction;
+    readonly removeWorkflowAction: RemoveWorkflowAction;
+    readonly saveActionRoute: SaveActionRoute;
+    readonly removeActionRoute: RemoveActionRoute;
     readonly listWorkSchedules: ListWorkSchedules;
     readonly saveWorkSchedule: SaveWorkSchedule;
     readonly removeWorkSchedule: RemoveWorkSchedule;
@@ -416,6 +514,18 @@ export interface Container {
     readonly removeHoliday: RemoveHoliday;
     readonly listEvaluationSummary: ListEvaluationSummary;
     readonly listEvaluationCriteria: ListEvaluationCriteria;
+    readonly listEvaluationCategories: ListEvaluationCategories;
+    readonly listCategoryScores: ListCategoryScores;
+    readonly listEvaluationRules: ListEvaluationRules;
+    readonly saveEvaluationRule: SaveEvaluationRule;
+    readonly removeEvaluationRule: RemoveEvaluationRule;
+    readonly previewEvaluationRules: PreviewEvaluationRules;
+    readonly applyEvaluationRules: ApplyEvaluationRules;
+    readonly revokeEvaluationRule: RevokeEvaluationRule;
+    readonly listEvaluationPeriodReport: ListEvaluationPeriodReport;
+    readonly takeEvaluationSnapshot: TakeEvaluationSnapshot;
+    readonly clearEvaluationSnapshot: ClearEvaluationSnapshot;
+    readonly listEvaluationAudit: ListEvaluationAudit;
     readonly saveEvaluationScore: SaveEvaluationScore;
     readonly setCriterionWeight: SetCriterionWeight;
     // المخازن
@@ -567,6 +677,9 @@ export function createContainer(overrides: ContainerOverrides = {}): Container {
   const inboxRepository = new SupabaseInboxRepository(client);
   const workflowEngine = new SupabaseWorkflowEngine(client);
   const workflowDefinitionRepository = new SupabaseWorkflowDefinitionRepository(client);
+  const schedulerRepository = new SupabaseSchedulerRepository(client);
+  const attachmentRepository = new SupabaseAttachmentRepository(client);
+  const operationsRepository = new SupabaseOperationsRepository(client);
   const workCalendarRepository = new SupabaseWorkCalendarRepository(client);
   const evaluationRepository = new SupabaseEvaluationRepository(client);
   const facilityRepository = new SupabaseFacilityRepository(client);
@@ -700,10 +813,14 @@ export function createContainer(overrides: ContainerOverrides = {}): Container {
 
       listInbox: new ListInbox(inboxRepository),
       getTransaction: new GetTransaction(inboxRepository),
+      listAvailableActions: new ListAvailableActions(inboxRepository),
+      getTransactionTimeline: new GetTransactionTimeline(inboxRepository),
       searchTransactions: new SearchTransactions(inboxRepository),
       startTransaction: new StartTransaction(workflowEngine),
-      completeStep: new CompleteStep(workflowEngine),
-      setStepDuration: new SetStepDuration(workflowEngine),
+      completeAssignment: new CompleteAssignment(workflowEngine),
+      receiveAssignment: new ReceiveAssignment(workflowEngine),
+      setAssignmentDuration: new SetAssignmentDuration(workflowEngine),
+      setTransactionContext: new SetTransactionContext(workflowEngine),
       closeTransaction: new CloseTransaction(workflowEngine),
       cancelTransaction: new CancelTransaction(workflowEngine),
       listDurationChanges: new ListDurationChanges(workflowDefinitionRepository),
@@ -711,8 +828,46 @@ export function createContainer(overrides: ContainerOverrides = {}): Container {
         workflowDefinitionRepository,
       ),
       saveWorkflowDefinition: new SaveWorkflowDefinition(workflowDefinitionRepository),
-      saveWorkflowStep: new SaveWorkflowStep(workflowDefinitionRepository),
-      removeWorkflowStep: new RemoveWorkflowStep(workflowDefinitionRepository),
+      listTransferTargets: new ListTransferTargets(operationsRepository),
+      transferAssignment: new TransferAssignment(operationsRepository),
+      sendAssignmentAlert: new SendAssignmentAlert(operationsRepository),
+      extendAssignmentDeadline: new ExtendAssignmentDeadline(operationsRepository),
+      forceCloseTransaction: new ForceCloseTransaction(operationsRepository),
+      mentionInTransaction: new MentionInTransaction(operationsRepository),
+      claimAssignment: new ClaimAssignment(operationsRepository),
+      releaseAssignmentClaim: new ReleaseAssignmentClaim(operationsRepository),
+      listArchiveQueue: new ListArchiveQueue(operationsRepository),
+      submitTransactionOriginal: new SubmitTransactionOriginal(operationsRepository),
+      acceptTransactionArchive: new AcceptTransactionArchive(operationsRepository),
+      rejectTransactionArchive: new RejectTransactionArchive(operationsRepository),
+
+      listTransactionAttachments: new ListTransactionAttachments(attachmentRepository),
+      addTransactionAttachment: new AddTransactionAttachment(attachmentRepository),
+      removeTransactionAttachment: new RemoveTransactionAttachment(
+        attachmentRepository,
+        fileStorage,
+      ),
+
+      listScheduledTasks: new ListScheduledTasks(schedulerRepository),
+      saveScheduledTask: new SaveScheduledTask(schedulerRepository),
+      removeScheduledTask: new RemoveScheduledTask(schedulerRepository),
+      runScheduledTaskNow: new RunScheduledTaskNow(schedulerRepository),
+      listScheduledTaskRuns: new ListScheduledTaskRuns(schedulerRepository),
+      previewSchedule: new PreviewSchedule(schedulerRepository),
+
+      saveWorkflowStage: new SaveWorkflowStage(workflowDefinitionRepository),
+      saveStagePositions: new SaveStagePositions(workflowDefinitionRepository),
+      saveStageRequirement: new SaveStageRequirement(workflowDefinitionRepository),
+      removeStageRequirement: new RemoveStageRequirement(workflowDefinitionRepository),
+      createWorkflowDraft: new CreateWorkflowDraft(workflowDefinitionRepository),
+      publishWorkflowVersion: new PublishWorkflowVersion(workflowDefinitionRepository),
+      removeWorkflowStage: new RemoveWorkflowStage(workflowDefinitionRepository),
+      saveStageParticipant: new SaveStageParticipant(workflowDefinitionRepository),
+      removeStageParticipant: new RemoveStageParticipant(workflowDefinitionRepository),
+      saveWorkflowAction: new SaveWorkflowAction(workflowDefinitionRepository),
+      removeWorkflowAction: new RemoveWorkflowAction(workflowDefinitionRepository),
+      saveActionRoute: new SaveActionRoute(workflowDefinitionRepository),
+      removeActionRoute: new RemoveActionRoute(workflowDefinitionRepository),
       listWorkSchedules: new ListWorkSchedules(workCalendarRepository),
       saveWorkSchedule: new SaveWorkSchedule(workCalendarRepository),
       removeWorkSchedule: new RemoveWorkSchedule(workCalendarRepository),
@@ -721,6 +876,18 @@ export function createContainer(overrides: ContainerOverrides = {}): Container {
       removeHoliday: new RemoveHoliday(workCalendarRepository),
       listEvaluationSummary: new ListEvaluationSummary(evaluationRepository),
       listEvaluationCriteria: new ListEvaluationCriteria(evaluationRepository),
+      listEvaluationCategories: new ListEvaluationCategories(evaluationRepository),
+      listCategoryScores: new ListCategoryScores(evaluationRepository),
+      listEvaluationRules: new ListEvaluationRules(evaluationRepository),
+      saveEvaluationRule: new SaveEvaluationRule(evaluationRepository),
+      removeEvaluationRule: new RemoveEvaluationRule(evaluationRepository),
+      previewEvaluationRules: new PreviewEvaluationRules(evaluationRepository),
+      applyEvaluationRules: new ApplyEvaluationRules(evaluationRepository),
+      revokeEvaluationRule: new RevokeEvaluationRule(evaluationRepository),
+      listEvaluationPeriodReport: new ListEvaluationPeriodReport(evaluationRepository),
+      takeEvaluationSnapshot: new TakeEvaluationSnapshot(evaluationRepository),
+      clearEvaluationSnapshot: new ClearEvaluationSnapshot(evaluationRepository),
+      listEvaluationAudit: new ListEvaluationAudit(evaluationRepository),
       saveEvaluationScore: new SaveEvaluationScore(evaluationRepository),
       setCriterionWeight: new SetCriterionWeight(evaluationRepository),
 

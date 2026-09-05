@@ -290,7 +290,7 @@ export function ReportsPage() {
           isLoading={overdue.isPending}
           filename="overdue-transactions"
           columns={overdueColumns()}
-          rowKey={(row: OverdueTransactionRowDto) => row.stepInstanceId}
+          rowKey={(row: OverdueTransactionRowDto) => row.assignmentId}
         />
       )}
 
@@ -560,7 +560,7 @@ function overdueColumns() {
     },
     { key: "subject", header: t.reports.subject, render: (r) => r.subject },
     { key: "project", header: t.reports.project, render: (r) => r.projectName || "—" },
-    { key: "step", header: t.reports.step, render: (r) => r.stepName },
+    { key: "step", header: t.reports.step, render: (r) => r.stageName },
     {
       key: "assignee",
       header: t.reports.assignee,
@@ -658,7 +658,7 @@ function durationColumns() {
       render: (r) => r.transactionNo,
     },
     { key: "subject", header: t.reports.subject, render: (r) => r.subject },
-    { key: "step", header: t.reports.step, render: (r) => r.stepName },
+    { key: "step", header: t.reports.step, render: (r) => r.stageName },
     {
       key: "assignee",
       header: t.reports.assignee,

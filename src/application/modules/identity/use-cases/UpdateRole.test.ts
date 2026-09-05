@@ -4,22 +4,31 @@ import type { IRoleRepository } from "../ports/role-repository";
 import { UpdateRole } from "./UpdateRole";
 
 function makeRoleRepo() {
-  const updateRole = vi.fn(async (role: { id: string; name: string; description: string | null }) =>
-    ok({
-      id: role.id,
-      key: "custom_role",
-      name: role.name,
-      description: role.description,
-      isSystem: false,
-      permissionKeys: [],
-    }),
+  const updateRole = vi.fn(
+    async (role: { id: string; name: string; description: string | null }) =>
+      ok({
+        id: role.id,
+        key: "custom_role",
+        name: role.name,
+        description: role.description,
+        isSystem: false,
+        permissionKeys: [],
+      }),
   );
   const setRolePermissions = vi.fn(async () => okVoid());
 
   const repo: IRoleRepository = {
     listRoles: async () => ok([]),
     listPermissions: async () => ok([]),
-    createRole: async () => ok({ id: "r1", key: "k", name: "n", description: null, isSystem: false, permissionKeys: [] }),
+    createRole: async () =>
+      ok({
+        id: "r1",
+        key: "k",
+        name: "n",
+        description: null,
+        isSystem: false,
+        permissionKeys: [],
+      }),
     updateRole,
     deleteRole: async () => okVoid(),
     getUsersCountForRole: async () => ok(0),

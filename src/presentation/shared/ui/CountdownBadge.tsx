@@ -5,7 +5,7 @@
  * [المراسلات 25]: أخضر منجَزة · أزرق نصف المدة · أصفر 75٪ · أحمر انتهت.
  */
 import { Clock, CheckCircle2, AlertTriangle, HelpCircle } from "lucide-react";
-import type { InboxColor } from "@core/modules/workflow/entities/StepInstance";
+import type { InboxColor } from "@core/modules/workflow/entities/Assignment";
 import { Badge, type BadgeTone } from "./Badge";
 import { formatDuration } from "../lib/formatters";
 import { t } from "@i18n/index";

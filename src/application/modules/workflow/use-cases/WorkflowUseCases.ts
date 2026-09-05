@@ -7,11 +7,13 @@ import { ConflictError, ValidationError } from "@core/shared/errors/domain-error
 import { err, type Result } from "@core/shared/result";
 import type { UseCase } from "@application/shared/use-case";
 import type {
-  CompleteStepDto,
+  AvailableActionDto,
+  CompleteAssignmentDto,
   DurationChangeDto,
   InboxFilter,
   InboxItemDto,
-  SetStepDurationDto,
+  TimelineEntryDto,
+  SetAssignmentDurationDto,
   StartTransactionDto,
   TransactionBriefDto,
   TransactionDto,
@@ -46,6 +48,43 @@ export class GetTransaction implements UseCase<{ id: string }, TransactionDto | 
     id: string;
   }): Promise<Result<TransactionDto | null, DomainError>> {
     return this.inbox.findTransaction(input.id);
+  }
+}
+
+/** الأزرار المتاحة الآن على تكليفاتي أو على معاملة بعينها. */
+export class ListAvailableActions implements UseCase<
+  { transactionId?: string; mineOnly?: boolean },
+  readonly AvailableActionDto[]
+> {
+  private readonly inbox: IInboxRepository;
+
+  constructor(inbox: IInboxRepository) {
+    this.inbox = inbox;
+  }
+
+  async execute(input: {
+    transactionId?: string;
+    mineOnly?: boolean;
+  }): Promise<Result<readonly AvailableActionDto[], DomainError>> {
+    return this.inbox.listAvailableActions(input);
+  }
+}
+
+/** الخطّ الزمني للمعاملة — بما فيه الملاحظات التي لم تحرّك مرحلة. */
+export class GetTransactionTimeline implements UseCase<
+  { transactionId: string },
+  readonly TimelineEntryDto[]
+> {
+  private readonly inbox: IInboxRepository;
+
+  constructor(inbox: IInboxRepository) {
+    this.inbox = inbox;
+  }
+
+  async execute(input: {
+    transactionId: string;
+  }): Promise<Result<readonly TimelineEntryDto[], DomainError>> {
+    return this.inbox.listTimeline(input.transactionId);
   }
 }
 
@@ -91,9 +130,13 @@ export class StartTransaction implements UseCase<
   }
 }
 
-export class CompleteStep implements UseCase<
-  CompleteStepDto,
-  { nextStepInstanceId: string | null }
+/**
+ * إنجاز تكليف واحد. لا يعني بالضرورة إغلاق المرحلة: تحت سياسة «الكل»
+ * تبقى مفتوحة حتى ينجز بقيّة المشاركين.
+ */
+export class CompleteAssignment implements UseCase<
+  CompleteAssignmentDto,
+  { nextStageInstanceId: string | null }
 > {
   private readonly engine: IWorkflowEngine;
 
@@ -102,9 +145,22 @@ export class CompleteStep implements UseCase<
   }
 
   async execute(
-    input: CompleteStepDto,
-  ): Promise<Result<{ nextStepInstanceId: string | null }, DomainError>> {
-    return this.engine.completeStep(input);
+    input: CompleteAssignmentDto,
+  ): Promise<Result<{ nextStageInstanceId: string | null }, DomainError>> {
+    return this.engine.completeAssignment(input);
+  }
+}
+
+/** استلام التكليف قبل الإجراء — حين تشترطه المرحلة. */
+export class ReceiveAssignment implements UseCase<{ assignmentId: string }, void> {
+  private readonly engine: IWorkflowEngine;
+
+  constructor(engine: IWorkflowEngine) {
+    this.engine = engine;
+  }
+
+  async execute(input: { assignmentId: string }): Promise<Result<void, DomainError>> {
+    return this.engine.receiveAssignment(input.assignmentId);
   }
 }
 
@@ -112,20 +168,45 @@ export class CompleteStep implements UseCase<
  * مدير البرنامج يحدّد المدة أو يعدّلها حتى بعد الإنجاز [المراسلات 3، 4].
  * التعديل يُعيد احتساب الدرجة على الخادم ويُسجَّل في تقرير المدد.
  */
-export class SetStepDuration implements UseCase<SetStepDurationDto, void> {
+export class SetAssignmentDuration implements UseCase<SetAssignmentDurationDto, void> {
   private readonly engine: IWorkflowEngine;
 
   constructor(engine: IWorkflowEngine) {
     this.engine = engine;
   }
 
-  async execute(input: SetStepDurationDto): Promise<Result<void, DomainError>> {
+  async execute(input: SetAssignmentDurationDto): Promise<Result<void, DomainError>> {
     if (!Number.isFinite(input.minutes) || input.minutes <= 0) {
       return err(
         new ValidationError("المدة يجب أن تكون أكبر من صفر", { minutes: "invalid" }),
       );
     }
-    return this.engine.setStepDuration(input);
+    return this.engine.setAssignmentDuration(input);
+  }
+}
+
+/**
+ * تحديث لقطة سياق المعاملة — القيم التي تُقاس عليها شروط التفريع.
+ * يستعملها المستند المصدر حين تتغيّر قيمته قبل بلوغ مرحلة متفرّعة.
+ */
+export class SetTransactionContext implements UseCase<
+  { transactionId: string; patch: Readonly<Record<string, unknown>> },
+  void
+> {
+  private readonly engine: IWorkflowEngine;
+
+  constructor(engine: IWorkflowEngine) {
+    this.engine = engine;
+  }
+
+  async execute(input: {
+    transactionId: string;
+    patch: Readonly<Record<string, unknown>>;
+  }): Promise<Result<void, DomainError>> {
+    if (Object.keys(input.patch).length === 0) {
+      return err(new ValidationError("لا قيم لتحديثها", { patch: "empty" }));
+    }
+    return this.engine.setTransactionContext(input.transactionId, input.patch);
   }
 }
 

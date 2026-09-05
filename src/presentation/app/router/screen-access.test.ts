@@ -106,9 +106,10 @@ describe("حراسة الشاشات — القائمة والمسارات مصد
     expect([...openInMenu].sort()).toEqual([...OPEN_TO_EVERYONE].sort());
   });
 
-  it("الإعدادات وفحص التأسيس خلف صلاحية إدارة الإعدادات", () => {
+  it("الإعدادات خلف صلاحية إدارة الإعدادات", () => {
     expect(effective.get("settings")).toBe("settings.manage");
-    expect(effective.get("setup")).toBe("settings.manage");
+    // شاشة `setup` حُذفت في 1f468c4، ومسارها مُعلَّق في routes.tsx
+    expect(effective.has("setup")).toBe(false);
   });
 
   it("ترحيل كشف البنك أضيق من اليوميات — لا يُجمعان تحت حارس واحد", () => {

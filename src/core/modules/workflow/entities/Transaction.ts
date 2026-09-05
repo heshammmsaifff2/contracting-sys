@@ -1,9 +1,12 @@
 /**
  * Transaction — المعاملة التي تسير في المحرّك.
  * ترقيمها آلي [المراسلات 20]، وتُقفل بتأكيد طالبها [المراسلات 9].
+ *
+ * منذ محرّك v2 قد تكون **أكثر من مرحلة نشطة في آن**، فلا مؤشّر مفرد
+ * لـ«المرحلة الحالية» — بل `openStages`.
  */
 import type { EntityId } from "../../../shared/entities/base-entity";
-import type { StepInstance } from "./StepInstance";
+import type { StageInstance } from "./StageInstance";
 
 export type TransactionStatus =
   "in_progress" | "awaiting_confirmation" | "completed" | "cancelled";
@@ -23,7 +26,7 @@ export interface TransactionProps {
   isClosed: boolean;
   closedAt: Date | null;
   createdAt: Date;
-  steps: readonly StepInstance[];
+  stages: readonly StageInstance[];
 }
 
 export class Transaction {
@@ -41,7 +44,7 @@ export class Transaction {
   readonly isClosed: boolean;
   readonly closedAt: Date | null;
   readonly createdAt: Date;
-  readonly steps: readonly StepInstance[];
+  readonly stages: readonly StageInstance[];
 
   private constructor(props: TransactionProps) {
     this.id = props.id;
@@ -58,7 +61,7 @@ export class Transaction {
     this.isClosed = props.isClosed;
     this.closedAt = props.closedAt;
     this.createdAt = props.createdAt;
-    this.steps = props.steps;
+    this.stages = props.stages;
     Object.freeze(this);
   }
 
@@ -66,13 +69,13 @@ export class Transaction {
     return new Transaction(props);
   }
 
-  /** المرحلة الجارية حاليًا. */
-  get currentStep(): StepInstance | null {
-    return this.steps.find((step) => step.status === "in_progress") ?? null;
+  /** المراحل الجارية — قد تكون أكثر من واحدة بعد التفريع المتوازي. */
+  get openStages(): readonly StageInstance[] {
+    return this.stages.filter((stage) => stage.isOpen);
   }
 
-  get completedSteps(): readonly StepInstance[] {
-    return this.steps.filter((step) => step.status === "done");
+  get completedStages(): readonly StageInstance[] {
+    return this.stages.filter((stage) => stage.status === "done");
   }
 
   /** «تمام الإنجاز» من حقّ طالب المعاملة وحده [المراسلات 9]. */
@@ -81,21 +84,30 @@ export class Transaction {
     return this.requestedBy === userId || canOverride;
   }
 
-  /** متأخّرة إن تجاوزت أي مرحلة جارية مدّتها. */
+  /** متأخّرة إن تجاوز أي مكلَّف على أي مرحلة جارية مدّته. */
   get isOverdue(): boolean {
-    return this.currentStep?.isOverdue ?? false;
+    return this.openStages.some((stage) => stage.isOverdue);
   }
 
-  /** متوسّط درجات المراحل المنجزة. */
+  /** ما ينتظر تصرّف هذا المستخدم الآن عبر كل المراحل الجارية. */
+  openAssignmentsFor(userId: EntityId) {
+    return this.openStages
+      .flatMap((stage) => stage.assignments)
+      .filter((a) => a.assigneeId === userId && a.status === "in_progress");
+  }
+
+  /** متوسّط درجات كل التكليفات المنجزة في المعاملة. */
   get averageScore(): number | null {
-    const scored = this.completedSteps.filter((step) => step.score !== null);
+    const scored = this.stages
+      .flatMap((stage) => stage.assignments)
+      .filter((a) => a.score !== null);
     if (scored.length === 0) return null;
-    const total = scored.reduce((sum, step) => sum + (step.score ?? 0), 0);
+    const total = scored.reduce((sum, a) => sum + (a.score ?? 0), 0);
     return Math.round((total / scored.length) * 100) / 100;
   }
 
   get progressRatio(): number {
-    if (this.steps.length === 0) return 0;
-    return this.completedSteps.length / this.steps.length;
+    if (this.stages.length === 0) return 0;
+    return this.completedStages.length / this.stages.length;
   }
 }

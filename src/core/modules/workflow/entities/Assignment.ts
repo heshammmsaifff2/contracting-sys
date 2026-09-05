@@ -1,27 +1,42 @@
 /**
- * StepInstance — مرحلة فعلية من معاملة.
+ * Assignment — تكليف موظف واحد بمرحلة.
+ *
+ * المرحلة قد تقف عند أكثر من موظف، فالمدة والعدّاد والدرجة تخصّ التكليف لا
+ * المرحلة: خمسة مشاركين على مرحلة واحدة يعطون خمس درجات مستقلة
+ * [المراسلات 11-18].
+ *
  * قاعدة الألوان [المراسلات 25] وقاعدة الدرجات [المراسلات 11] محسوبتان على
  * الخادم داخل مواعيد العمل؛ ما هنا نسخة مطابقة للعرض الفوري والتحقّق المسبق.
  */
 import type { EntityId } from "../../../shared/entities/base-entity";
 
-export type StepStatus = "pending" | "in_progress" | "done" | "cancelled";
+/**
+ * `on_hold` = مؤهَّل لكنّ زميلًا حجز المرحلة [المرحلة ٠٧].
+ * يُميَّز عن `cancelled` لأن الملغى لا يعود، والمعلَّق ينتظر إطلاق الحجز.
+ */
+export type AssignmentStatus =
+  "pending" | "in_progress" | "on_hold" | "done" | "cancelled";
 
 /** ألوان صندوق الوارد الأربعة + الحياد قبل نصف المدة. */
 export type InboxColor = "neutral" | "info" | "warning" | "danger" | "success";
 
-export interface StepInstanceProps {
+export interface AssignmentProps {
   id: EntityId;
+  stageInstanceId: EntityId;
   transactionId: EntityId;
-  orderNo: number;
-  name: string;
   assigneeId: EntityId | null;
   assigneeName: string;
+  /** مشارك اختياري لا يمنع إغلاق المرحلة تحت سياسة «الكل». */
+  isOptional: boolean;
   /** null = بانتظار مدير البرنامج ليحدّد المدة — العدّاد لا يبدأ قبلها. */
   allocatedMinutes: number | null;
   arrivedAt: Date | null;
+  /** متى ضغط «استلام» — يلزم قبل الإنجاز إن كانت المرحلة تشترطه. */
+  receivedAt: Date | null;
+  /** متى حجزها على نفسه تحت سياسة الحجز الحصريّ. */
+  claimedAt: Date | null;
   completedAt: Date | null;
-  status: StepStatus;
+  status: AssignmentStatus;
   score: number | null;
   notes: string;
   managerNote: string;
@@ -30,32 +45,36 @@ export interface StepInstanceProps {
   dueAt: Date | null;
 }
 
-export class StepInstance {
+export class Assignment {
   readonly id: EntityId;
+  readonly stageInstanceId: EntityId;
   readonly transactionId: EntityId;
-  readonly orderNo: number;
-  readonly name: string;
   readonly assigneeId: EntityId | null;
   readonly assigneeName: string;
+  readonly isOptional: boolean;
   readonly allocatedMinutes: number | null;
   readonly arrivedAt: Date | null;
+  readonly receivedAt: Date | null;
+  readonly claimedAt: Date | null;
   readonly completedAt: Date | null;
-  readonly status: StepStatus;
+  readonly status: AssignmentStatus;
   readonly score: number | null;
   readonly notes: string;
   readonly managerNote: string;
   readonly elapsedMinutes: number;
   readonly dueAt: Date | null;
 
-  private constructor(props: StepInstanceProps) {
+  private constructor(props: AssignmentProps) {
     this.id = props.id;
+    this.stageInstanceId = props.stageInstanceId;
     this.transactionId = props.transactionId;
-    this.orderNo = props.orderNo;
-    this.name = props.name;
     this.assigneeId = props.assigneeId;
     this.assigneeName = props.assigneeName;
+    this.isOptional = props.isOptional;
     this.allocatedMinutes = props.allocatedMinutes;
     this.arrivedAt = props.arrivedAt;
+    this.receivedAt = props.receivedAt;
+    this.claimedAt = props.claimedAt;
     this.completedAt = props.completedAt;
     this.status = props.status;
     this.score = props.score;
@@ -66,8 +85,8 @@ export class StepInstance {
     Object.freeze(this);
   }
 
-  static restore(props: StepInstanceProps): StepInstance {
-    return new StepInstance(props);
+  static restore(props: AssignmentProps): Assignment {
+    return new Assignment(props);
   }
 
   /** المدة لم تُحدَّد بعد ⇒ المعاملة واقفة عند مدير البرنامج [المراسلات 3]. */
@@ -95,7 +114,7 @@ export class StepInstance {
    * لون الحالة [المراسلات 25]:
    * أخضر = منجَزة · أحمر = انتهت المدة · أصفر = مرّ 75٪ · أزرق = مرّ نصف المدة
    */
-  static colorFor(status: StepStatus, elapsedRatio: number | null): InboxColor {
+  static colorFor(status: AssignmentStatus, elapsedRatio: number | null): InboxColor {
     if (status === "done") return "success";
     if (elapsedRatio === null) return "neutral";
     if (elapsedRatio >= 1) return "danger";
@@ -105,13 +124,24 @@ export class StepInstance {
   }
 
   get color(): InboxColor {
-    return StepInstance.colorFor(this.status, this.elapsedRatio);
+    return Assignment.colorFor(this.status, this.elapsedRatio);
   }
 
-  /** صاحب المرحلة وحده يُنجزها، ما لم يملك المستخدم صلاحية التجاوز. */
-  canBeCompletedBy(userId: EntityId, canOverride: boolean): boolean {
+  /**
+   * صاحب التكليف وحده يُنجزه، ما لم يملك المستخدم صلاحية التجاوز.
+   * `requiresReceive` يأتي من المرحلة الحاوية.
+   */
+  canBeCompletedBy(
+    userId: EntityId,
+    canOverride: boolean,
+    requiresReceive = false,
+    requiresClaim = false,
+  ): boolean {
+    // المعلَّق بحجز زميل ليس «قيد التنفيذ»، فيسقط هنا بلا شرط إضافي
     if (this.status !== "in_progress") return false;
     if (this.allocatedMinutes === null) return false;
+    if (requiresReceive && this.receivedAt === null) return false;
+    if (requiresClaim && this.claimedAt === null) return false;
     return this.assigneeId === userId || canOverride;
   }
 }

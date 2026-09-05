@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.15"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -199,6 +199,13 @@ export type Database = {
             foreignKeyName: "archive_receipts_transaction_id_fkey"
             columns: ["transaction_id"]
             isOneToOne: true
+            referencedRelation: "archive_queue"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "archive_receipts_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: true
             referencedRelation: "overdue_transactions_report"
             referencedColumns: ["transaction_id"]
           },
@@ -282,75 +289,6 @@ export type Database = {
             columns: ["worker_id"]
             isOneToOne: false
             referencedRelation: "employees"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      auto_letter_rules: {
-        Row: {
-          body_template: string
-          created_at: string
-          created_by: string | null
-          id: string
-          interval_days: number | null
-          is_active: boolean
-          last_run_at: string | null
-          next_run_at: string
-          project_id: string | null
-          recipients: string[]
-          repeat: boolean
-          schedule_cron: string
-          subject: string
-          transaction_type: string
-          updated_at: string
-        }
-        Insert: {
-          body_template?: string
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          interval_days?: number | null
-          is_active?: boolean
-          last_run_at?: string | null
-          next_run_at?: string
-          project_id?: string | null
-          recipients?: string[]
-          repeat?: boolean
-          schedule_cron?: string
-          subject: string
-          transaction_type?: string
-          updated_at?: string
-        }
-        Update: {
-          body_template?: string
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          interval_days?: number | null
-          is_active?: boolean
-          last_run_at?: string | null
-          next_run_at?: string
-          project_id?: string | null
-          recipients?: string[]
-          repeat?: boolean
-          schedule_cron?: string
-          subject?: string
-          transaction_type?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "auto_letter_rules_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "project_cost_summary"
-            referencedColumns: ["project_id"]
-          },
-          {
-            foreignKeyName: "auto_letter_rules_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -844,59 +782,66 @@ export type Database = {
       }
       duration_change_log: {
         Row: {
+          assignment_id: string
           changed_at: string
           changed_by: string | null
           id: string
           new_minutes: number
           old_minutes: number | null
           reason: string
-          step_instance_id: string
         }
         Insert: {
+          assignment_id: string
           changed_at?: string
           changed_by?: string | null
           id?: string
           new_minutes: number
           old_minutes?: number | null
           reason?: string
-          step_instance_id: string
         }
         Update: {
+          assignment_id?: string
           changed_at?: string
           changed_by?: string | null
           id?: string
           new_minutes?: number
           old_minutes?: number | null
           reason?: string
-          step_instance_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "duration_change_log_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assignment_available_actions"
+            referencedColumns: ["assignment_id"]
+          },
+          {
+            foreignKeyName: "duration_change_log_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "overdue_transactions_report"
+            referencedColumns: ["assignment_id"]
+          },
+          {
+            foreignKeyName: "duration_change_log_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duration_change_log_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_inbox"
+            referencedColumns: ["assignment_id"]
+          },
           {
             foreignKeyName: "duration_change_log_changed_by_fkey"
             columns: ["changed_by"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "duration_change_log_step_instance_id_fkey"
-            columns: ["step_instance_id"]
-            isOneToOne: false
-            referencedRelation: "overdue_transactions_report"
-            referencedColumns: ["step_instance_id"]
-          },
-          {
-            foreignKeyName: "duration_change_log_step_instance_id_fkey"
-            columns: ["step_instance_id"]
-            isOneToOne: false
-            referencedRelation: "transaction_inbox"
-            referencedColumns: ["step_instance_id"]
-          },
-          {
-            foreignKeyName: "duration_change_log_step_instance_id_fkey"
-            columns: ["step_instance_id"]
-            isOneToOne: false
-            referencedRelation: "transaction_step_instances"
             referencedColumns: ["id"]
           },
         ]
@@ -1126,35 +1071,203 @@ export type Database = {
           },
         ]
       }
-      evaluation_criteria: {
+      evaluation_adjustments: {
+        Row: {
+          applied_at: string
+          applied_by: string | null
+          effect: string
+          id: string
+          metrics: Json
+          period: string
+          points: number
+          reason: string
+          rule_id: string | null
+          rule_key: string
+          user_id: string
+        }
+        Insert: {
+          applied_at?: string
+          applied_by?: string | null
+          effect: string
+          id?: string
+          metrics?: Json
+          period: string
+          points: number
+          reason?: string
+          rule_id?: string | null
+          rule_key?: string
+          user_id: string
+        }
+        Update: {
+          applied_at?: string
+          applied_by?: string | null
+          effect?: string
+          id?: string
+          metrics?: Json
+          period?: string
+          points?: number
+          reason?: string
+          rule_id?: string | null
+          rule_key?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evaluation_adjustments_applied_by_fkey"
+            columns: ["applied_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evaluation_adjustments_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "evaluation_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evaluation_adjustments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      evaluation_audit_log: {
+        Row: {
+          acted_at: string
+          action: string
+          actor_id: string | null
+          after_data: Json | null
+          before_data: Json | null
+          entity: string
+          entity_id: string | null
+          id: string
+          period: string | null
+          user_id: string | null
+        }
+        Insert: {
+          acted_at?: string
+          action: string
+          actor_id?: string | null
+          after_data?: Json | null
+          before_data?: Json | null
+          entity: string
+          entity_id?: string | null
+          id?: string
+          period?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          acted_at?: string
+          action?: string
+          actor_id?: string | null
+          after_data?: Json | null
+          before_data?: Json | null
+          entity?: string
+          entity_id?: string | null
+          id?: string
+          period?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evaluation_audit_log_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evaluation_audit_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      evaluation_categories: {
         Row: {
           created_at: string
+          description: string
+          id: string
+          is_active: boolean
+          key: string
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          id?: string
+          is_active?: boolean
+          key: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          is_active?: boolean
+          key?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      evaluation_criteria: {
+        Row: {
+          category_id: string | null
+          created_at: string
+          description: string
           id: string
           is_active: boolean
           key: string
           kind: string
           name: string
+          sort_order: number
           updated_at: string
         }
         Insert: {
+          category_id?: string | null
           created_at?: string
+          description?: string
           id?: string
           is_active?: boolean
           key: string
           kind?: string
           name: string
+          sort_order?: number
           updated_at?: string
         }
         Update: {
+          category_id?: string | null
           created_at?: string
+          description?: string
           id?: string
           is_active?: boolean
           key?: string
           kind?: string
           name?: string
+          sort_order?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "evaluation_criteria_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "evaluation_categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       evaluation_exclusions: {
         Row: {
@@ -1184,6 +1297,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      evaluation_rules: {
+        Row: {
+          condition: Json
+          created_at: string
+          created_by: string | null
+          effect: string
+          employee_type: string | null
+          id: string
+          is_active: boolean
+          key: string
+          max_points: number | null
+          name: string
+          per_unit_field: string | null
+          points: number
+          reason_template: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          condition: Json
+          created_at?: string
+          created_by?: string | null
+          effect: string
+          employee_type?: string | null
+          id?: string
+          is_active?: boolean
+          key: string
+          max_points?: number | null
+          name: string
+          per_unit_field?: string | null
+          points: number
+          reason_template?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          condition?: Json
+          created_at?: string
+          created_by?: string | null
+          effect?: string
+          employee_type?: string | null
+          id?: string
+          is_active?: boolean
+          key?: string
+          max_points?: number | null
+          name?: string
+          per_unit_field?: string | null
+          points?: number
+          reason_template?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       evaluation_scores: {
         Row: {
@@ -1233,6 +1400,66 @@ export type Database = {
           },
           {
             foreignKeyName: "evaluation_scores_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      evaluation_snapshots: {
+        Row: {
+          adjustment_points: number
+          base_score: number | null
+          breakdown: Json
+          completed_steps: number
+          employee_type: string
+          final_score: number | null
+          id: string
+          period: string
+          rank_in_period: number | null
+          taken_at: string
+          taken_by: string | null
+          user_id: string
+        }
+        Insert: {
+          adjustment_points?: number
+          base_score?: number | null
+          breakdown?: Json
+          completed_steps?: number
+          employee_type?: string
+          final_score?: number | null
+          id?: string
+          period: string
+          rank_in_period?: number | null
+          taken_at?: string
+          taken_by?: string | null
+          user_id: string
+        }
+        Update: {
+          adjustment_points?: number
+          base_score?: number | null
+          breakdown?: Json
+          completed_steps?: number
+          employee_type?: string
+          final_score?: number | null
+          id?: string
+          period?: string
+          rank_in_period?: number | null
+          taken_at?: string
+          taken_by?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evaluation_snapshots_taken_by_fkey"
+            columns: ["taken_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evaluation_snapshots_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -3400,6 +3627,144 @@ export type Database = {
           },
         ]
       }
+      scheduled_task_runs: {
+        Row: {
+          audience_count: number
+          created_transaction_ids: string[]
+          error: string
+          fired_at: string
+          id: string
+          notified_count: number
+          scheduled_for: string | null
+          status: string
+          task_id: string
+        }
+        Insert: {
+          audience_count?: number
+          created_transaction_ids?: string[]
+          error?: string
+          fired_at?: string
+          id?: string
+          notified_count?: number
+          scheduled_for?: string | null
+          status: string
+          task_id: string
+        }
+        Update: {
+          audience_count?: number
+          created_transaction_ids?: string[]
+          error?: string
+          fired_at?: string
+          id?: string
+          notified_count?: number
+          scheduled_for?: string | null
+          status?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_task_runs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "scheduled_task_status"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_task_runs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "scheduled_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scheduled_tasks: {
+        Row: {
+          action: string
+          audience: Json
+          body_template: string
+          context: Json
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          last_error: string
+          last_run_at: string | null
+          last_status: string | null
+          name: string
+          next_run_at: string
+          project_id: string | null
+          run_count: number
+          schedule_kind: string
+          schedule_spec: Json
+          shift_to_workday: boolean
+          subject_template: string
+          transaction_type: string | null
+          updated_at: string
+        }
+        Insert: {
+          action: string
+          audience?: Json
+          body_template?: string
+          context?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          last_error?: string
+          last_run_at?: string | null
+          last_status?: string | null
+          name: string
+          next_run_at?: string
+          project_id?: string | null
+          run_count?: number
+          schedule_kind: string
+          schedule_spec?: Json
+          shift_to_workday?: boolean
+          subject_template?: string
+          transaction_type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          action?: string
+          audience?: Json
+          body_template?: string
+          context?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          last_error?: string
+          last_run_at?: string | null
+          last_status?: string | null
+          name?: string
+          next_run_at?: string
+          project_id?: string | null
+          run_count?: number
+          schedule_kind?: string
+          schedule_spec?: Json
+          shift_to_workday?: boolean
+          subject_template?: string
+          transaction_type?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_tasks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_cost_summary"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "scheduled_tasks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       settings: {
         Row: {
           category: string
@@ -3937,103 +4302,140 @@ export type Database = {
           },
         ]
       }
-      transaction_step_instances: {
+      transaction_action_log: {
         Row: {
-          allocated_minutes: number | null
-          arrived_at: string | null
-          assignee_id: string | null
-          completed_at: string | null
-          created_at: string
+          acted_at: string
+          acted_by: string | null
+          action_id: string | null
+          action_key: string
+          action_label: string
+          assignment_id: string | null
           id: string
-          manager_note: string
-          manager_note_visible_to: string | null
-          name: string
+          kind: string
           notes: string
-          order_no: number
-          score: number | null
-          status: string
-          step_id: string | null
+          stage_instance_id: string | null
           transaction_id: string
         }
         Insert: {
-          allocated_minutes?: number | null
-          arrived_at?: string | null
-          assignee_id?: string | null
-          completed_at?: string | null
-          created_at?: string
+          acted_at?: string
+          acted_by?: string | null
+          action_id?: string | null
+          action_key?: string
+          action_label?: string
+          assignment_id?: string | null
           id?: string
-          manager_note?: string
-          manager_note_visible_to?: string | null
-          name?: string
+          kind?: string
           notes?: string
-          order_no: number
-          score?: number | null
-          status?: string
-          step_id?: string | null
+          stage_instance_id?: string | null
           transaction_id: string
         }
         Update: {
-          allocated_minutes?: number | null
-          arrived_at?: string | null
-          assignee_id?: string | null
-          completed_at?: string | null
-          created_at?: string
+          acted_at?: string
+          acted_by?: string | null
+          action_id?: string | null
+          action_key?: string
+          action_label?: string
+          assignment_id?: string | null
           id?: string
-          manager_note?: string
-          manager_note_visible_to?: string | null
-          name?: string
+          kind?: string
           notes?: string
-          order_no?: number
-          score?: number | null
-          status?: string
-          step_id?: string | null
+          stage_instance_id?: string | null
           transaction_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "transaction_step_instances_assignee_id_fkey"
-            columns: ["assignee_id"]
+            foreignKeyName: "transaction_action_log_acted_by_fkey"
+            columns: ["acted_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "transaction_step_instances_manager_note_visible_to_fkey"
-            columns: ["manager_note_visible_to"]
+            foreignKeyName: "transaction_action_log_action_id_fkey"
+            columns: ["action_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "assignment_available_actions"
+            referencedColumns: ["action_id"]
+          },
+          {
+            foreignKeyName: "transaction_action_log_action_id_fkey"
+            columns: ["action_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_actions"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "transaction_step_instances_step_id_fkey"
-            columns: ["step_id"]
+            foreignKeyName: "transaction_action_log_assignment_id_fkey"
+            columns: ["assignment_id"]
             isOneToOne: false
-            referencedRelation: "workflow_steps"
+            referencedRelation: "assignment_available_actions"
+            referencedColumns: ["assignment_id"]
+          },
+          {
+            foreignKeyName: "transaction_action_log_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "overdue_transactions_report"
+            referencedColumns: ["assignment_id"]
+          },
+          {
+            foreignKeyName: "transaction_action_log_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_assignments"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "transaction_step_instances_transaction_id_fkey"
+            foreignKeyName: "transaction_action_log_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_inbox"
+            referencedColumns: ["assignment_id"]
+          },
+          {
+            foreignKeyName: "transaction_action_log_stage_instance_id_fkey"
+            columns: ["stage_instance_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_stage_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_action_log_stage_instance_id_fkey"
+            columns: ["stage_instance_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_stage_progress"
+            referencedColumns: ["stage_instance_id"]
+          },
+          {
+            foreignKeyName: "transaction_action_log_transaction_id_fkey"
             columns: ["transaction_id"]
             isOneToOne: false
             referencedRelation: "archive_pending_report"
             referencedColumns: ["transaction_id"]
           },
           {
-            foreignKeyName: "transaction_step_instances_transaction_id_fkey"
+            foreignKeyName: "transaction_action_log_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "archive_queue"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_action_log_transaction_id_fkey"
             columns: ["transaction_id"]
             isOneToOne: false
             referencedRelation: "overdue_transactions_report"
             referencedColumns: ["transaction_id"]
           },
           {
-            foreignKeyName: "transaction_step_instances_transaction_id_fkey"
+            foreignKeyName: "transaction_action_log_transaction_id_fkey"
             columns: ["transaction_id"]
             isOneToOne: false
             referencedRelation: "transaction_inbox"
             referencedColumns: ["transaction_id"]
           },
           {
-            foreignKeyName: "transaction_step_instances_transaction_id_fkey"
+            foreignKeyName: "transaction_action_log_transaction_id_fkey"
             columns: ["transaction_id"]
             isOneToOne: false
             referencedRelation: "transactions"
@@ -4041,15 +4443,663 @@ export type Database = {
           },
         ]
       }
+      transaction_alerts: {
+        Row: {
+          assignment_id: string
+          id: string
+          kind: string
+          reason: string
+          sent_at: string
+          sent_by: string | null
+          transaction_id: string
+        }
+        Insert: {
+          assignment_id: string
+          id?: string
+          kind: string
+          reason?: string
+          sent_at?: string
+          sent_by?: string | null
+          transaction_id: string
+        }
+        Update: {
+          assignment_id?: string
+          id?: string
+          kind?: string
+          reason?: string
+          sent_at?: string
+          sent_by?: string | null
+          transaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_alerts_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assignment_available_actions"
+            referencedColumns: ["assignment_id"]
+          },
+          {
+            foreignKeyName: "transaction_alerts_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "overdue_transactions_report"
+            referencedColumns: ["assignment_id"]
+          },
+          {
+            foreignKeyName: "transaction_alerts_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_alerts_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_inbox"
+            referencedColumns: ["assignment_id"]
+          },
+          {
+            foreignKeyName: "transaction_alerts_sent_by_fkey"
+            columns: ["sent_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_alerts_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "archive_pending_report"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_alerts_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "archive_queue"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_alerts_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "overdue_transactions_report"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_alerts_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_inbox"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_alerts_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transaction_assignments: {
+        Row: {
+          acted_action_id: string | null
+          allocated_minutes: number | null
+          arrived_at: string
+          assignee_id: string | null
+          claimed_at: string | null
+          completed_at: string | null
+          created_at: string
+          extended_minutes: number
+          id: string
+          is_optional: boolean
+          manager_note: string
+          manager_note_visible_to: string | null
+          notes: string
+          participant_id: string | null
+          received_at: string | null
+          score: number | null
+          stage_instance_id: string
+          status: string
+          transaction_id: string
+          warnings_count: number
+        }
+        Insert: {
+          acted_action_id?: string | null
+          allocated_minutes?: number | null
+          arrived_at?: string
+          assignee_id?: string | null
+          claimed_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          extended_minutes?: number
+          id?: string
+          is_optional?: boolean
+          manager_note?: string
+          manager_note_visible_to?: string | null
+          notes?: string
+          participant_id?: string | null
+          received_at?: string | null
+          score?: number | null
+          stage_instance_id: string
+          status?: string
+          transaction_id: string
+          warnings_count?: number
+        }
+        Update: {
+          acted_action_id?: string | null
+          allocated_minutes?: number | null
+          arrived_at?: string
+          assignee_id?: string | null
+          claimed_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          extended_minutes?: number
+          id?: string
+          is_optional?: boolean
+          manager_note?: string
+          manager_note_visible_to?: string | null
+          notes?: string
+          participant_id?: string | null
+          received_at?: string | null
+          score?: number | null
+          stage_instance_id?: string
+          status?: string
+          transaction_id?: string
+          warnings_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_assignments_acted_action_fkey"
+            columns: ["acted_action_id"]
+            isOneToOne: false
+            referencedRelation: "assignment_available_actions"
+            referencedColumns: ["action_id"]
+          },
+          {
+            foreignKeyName: "transaction_assignments_acted_action_fkey"
+            columns: ["acted_action_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_actions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_assignments_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_assignments_manager_note_visible_to_fkey"
+            columns: ["manager_note_visible_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_assignments_participant_id_fkey"
+            columns: ["participant_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_stage_participants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_assignments_stage_instance_id_fkey"
+            columns: ["stage_instance_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_stage_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_assignments_stage_instance_id_fkey"
+            columns: ["stage_instance_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_stage_progress"
+            referencedColumns: ["stage_instance_id"]
+          },
+          {
+            foreignKeyName: "transaction_assignments_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "archive_pending_report"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_assignments_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "archive_queue"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_assignments_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "overdue_transactions_report"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_assignments_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_inbox"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_assignments_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transaction_attachments: {
+        Row: {
+          action_log_id: string | null
+          assignment_id: string | null
+          content_type: string
+          created_at: string
+          department_id: string | null
+          file: Json
+          id: string
+          is_authenticated: boolean
+          name: string
+          required_permission: string | null
+          size_bytes: number
+          stage_instance_id: string | null
+          transaction_id: string
+          uploaded_by: string | null
+          visibility: string
+        }
+        Insert: {
+          action_log_id?: string | null
+          assignment_id?: string | null
+          content_type?: string
+          created_at?: string
+          department_id?: string | null
+          file: Json
+          id?: string
+          is_authenticated?: boolean
+          name: string
+          required_permission?: string | null
+          size_bytes?: number
+          stage_instance_id?: string | null
+          transaction_id: string
+          uploaded_by?: string | null
+          visibility?: string
+        }
+        Update: {
+          action_log_id?: string | null
+          assignment_id?: string | null
+          content_type?: string
+          created_at?: string
+          department_id?: string | null
+          file?: Json
+          id?: string
+          is_authenticated?: boolean
+          name?: string
+          required_permission?: string | null
+          size_bytes?: number
+          stage_instance_id?: string | null
+          transaction_id?: string
+          uploaded_by?: string | null
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_attachments_action_log_id_fkey"
+            columns: ["action_log_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_action_log"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_action_log_id_fkey"
+            columns: ["action_log_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_timeline"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assignment_available_actions"
+            referencedColumns: ["assignment_id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "overdue_transactions_report"
+            referencedColumns: ["assignment_id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_inbox"
+            referencedColumns: ["assignment_id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "department_frequency_report"
+            referencedColumns: ["department_id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_stage_instance_id_fkey"
+            columns: ["stage_instance_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_stage_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_stage_instance_id_fkey"
+            columns: ["stage_instance_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_stage_progress"
+            referencedColumns: ["stage_instance_id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "archive_pending_report"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "archive_queue"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "overdue_transactions_report"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_inbox"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transaction_mentions: {
+        Row: {
+          action_log_id: string | null
+          created_at: string
+          id: string
+          mentioned_by: string | null
+          mentioned_user_id: string
+          transaction_id: string
+        }
+        Insert: {
+          action_log_id?: string | null
+          created_at?: string
+          id?: string
+          mentioned_by?: string | null
+          mentioned_user_id: string
+          transaction_id: string
+        }
+        Update: {
+          action_log_id?: string | null
+          created_at?: string
+          id?: string
+          mentioned_by?: string | null
+          mentioned_user_id?: string
+          transaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_mentions_action_log_id_fkey"
+            columns: ["action_log_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_action_log"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_mentions_action_log_id_fkey"
+            columns: ["action_log_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_timeline"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_mentions_mentioned_by_fkey"
+            columns: ["mentioned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_mentions_mentioned_user_id_fkey"
+            columns: ["mentioned_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_mentions_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "archive_pending_report"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_mentions_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "archive_queue"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_mentions_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "overdue_transactions_report"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_mentions_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_inbox"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_mentions_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transaction_stage_instances: {
+        Row: {
+          claim_policy: string
+          completed_at: string | null
+          completion_policy: string
+          conflict_policy: string
+          created_at: string
+          entered_at: string
+          id: string
+          is_archive: boolean
+          is_deferred_join: boolean
+          is_final: boolean
+          join_policy: string
+          name: string
+          quorum_count: number | null
+          requires_receive: boolean
+          resolved_by_action_id: string | null
+          seq: number
+          stage_id: string | null
+          stage_key: string
+          status: string
+          transaction_id: string
+        }
+        Insert: {
+          claim_policy?: string
+          completed_at?: string | null
+          completion_policy?: string
+          conflict_policy?: string
+          created_at?: string
+          entered_at?: string
+          id?: string
+          is_archive?: boolean
+          is_deferred_join?: boolean
+          is_final?: boolean
+          join_policy?: string
+          name?: string
+          quorum_count?: number | null
+          requires_receive?: boolean
+          resolved_by_action_id?: string | null
+          seq: number
+          stage_id?: string | null
+          stage_key?: string
+          status?: string
+          transaction_id: string
+        }
+        Update: {
+          claim_policy?: string
+          completed_at?: string | null
+          completion_policy?: string
+          conflict_policy?: string
+          created_at?: string
+          entered_at?: string
+          id?: string
+          is_archive?: boolean
+          is_deferred_join?: boolean
+          is_final?: boolean
+          join_policy?: string
+          name?: string
+          quorum_count?: number | null
+          requires_receive?: boolean
+          resolved_by_action_id?: string | null
+          seq?: number
+          stage_id?: string | null
+          stage_key?: string
+          status?: string
+          transaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_stage_instances_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_stage_instances_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "archive_pending_report"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_stage_instances_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "archive_queue"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_stage_instances_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "overdue_transactions_report"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_stage_instances_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_inbox"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_stage_instances_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tsi_resolved_by_action_fkey"
+            columns: ["resolved_by_action_id"]
+            isOneToOne: false
+            referencedRelation: "assignment_available_actions"
+            referencedColumns: ["action_id"]
+          },
+          {
+            foreignKeyName: "tsi_resolved_by_action_fkey"
+            columns: ["resolved_by_action_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_actions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transactions: {
         Row: {
+          archive_location: string
+          archive_state: string
+          archive_submitted_at: string | null
+          archive_submitted_by: string | null
+          archived_at: string | null
+          archived_by: string | null
+          audience_ids: string[]
           closed_at: string | null
+          context: Json
           created_at: string
           created_by: string | null
-          current_step_instance_id: string | null
           definition_id: string | null
           entity_id: string | null
           entity_type: string | null
+          force_close_reason: string
+          force_closed: boolean
           id: string
           is_closed: boolean
           no: number
@@ -4061,13 +5111,22 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archive_location?: string
+          archive_state?: string
+          archive_submitted_at?: string | null
+          archive_submitted_by?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          audience_ids?: string[]
           closed_at?: string | null
+          context?: Json
           created_at?: string
           created_by?: string | null
-          current_step_instance_id?: string | null
           definition_id?: string | null
           entity_id?: string | null
           entity_type?: string | null
+          force_close_reason?: string
+          force_closed?: boolean
           id?: string
           is_closed?: boolean
           no?: never
@@ -4079,13 +5138,22 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archive_location?: string
+          archive_state?: string
+          archive_submitted_at?: string | null
+          archive_submitted_by?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          audience_ids?: string[]
           closed_at?: string | null
+          context?: Json
           created_at?: string
           created_by?: string | null
-          current_step_instance_id?: string | null
           definition_id?: string | null
           entity_id?: string | null
           entity_type?: string | null
+          force_close_reason?: string
+          force_closed?: boolean
           id?: string
           is_closed?: boolean
           no?: never
@@ -4098,24 +5166,17 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "transactions_current_step_fkey"
-            columns: ["current_step_instance_id"]
+            foreignKeyName: "transactions_archive_submitted_by_fkey"
+            columns: ["archive_submitted_by"]
             isOneToOne: false
-            referencedRelation: "overdue_transactions_report"
-            referencedColumns: ["step_instance_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "transactions_current_step_fkey"
-            columns: ["current_step_instance_id"]
+            foreignKeyName: "transactions_archived_by_fkey"
+            columns: ["archived_by"]
             isOneToOne: false
-            referencedRelation: "transaction_inbox"
-            referencedColumns: ["step_instance_id"]
-          },
-          {
-            foreignKeyName: "transactions_current_step_fkey"
-            columns: ["current_step_instance_id"]
-            isOneToOne: false
-            referencedRelation: "transaction_step_instances"
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -4364,107 +5425,370 @@ export type Database = {
           },
         ]
       }
+      workflow_action_routes: {
+        Row: {
+          action_id: string
+          condition: Json | null
+          created_at: string
+          created_by: string | null
+          id: string
+          priority: number
+          target_stage_id: string
+          updated_at: string
+        }
+        Insert: {
+          action_id: string
+          condition?: Json | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          priority?: number
+          target_stage_id: string
+          updated_at?: string
+        }
+        Update: {
+          action_id?: string
+          condition?: Json | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          priority?: number
+          target_stage_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_action_routes_action_id_fkey"
+            columns: ["action_id"]
+            isOneToOne: false
+            referencedRelation: "assignment_available_actions"
+            referencedColumns: ["action_id"]
+          },
+          {
+            foreignKeyName: "workflow_action_routes_action_id_fkey"
+            columns: ["action_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_actions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_action_routes_target_stage_id_fkey"
+            columns: ["target_stage_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_actions: {
+        Row: {
+          action_key: string
+          created_at: string
+          created_by: string | null
+          id: string
+          kind: string
+          label: string
+          requires_attachment: boolean
+          requires_evaluation: boolean
+          requires_note: boolean
+          return_minutes: number | null
+          sort_order: number
+          stage_id: string
+          updated_at: string
+        }
+        Insert: {
+          action_key: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind: string
+          label: string
+          requires_attachment?: boolean
+          requires_evaluation?: boolean
+          requires_note?: boolean
+          return_minutes?: number | null
+          sort_order?: number
+          stage_id: string
+          updated_at?: string
+        }
+        Update: {
+          action_key?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: string
+          label?: string
+          requires_attachment?: boolean
+          requires_evaluation?: boolean
+          requires_note?: boolean
+          return_minutes?: number | null
+          sort_order?: number
+          stage_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_actions_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workflow_definitions: {
         Row: {
           created_at: string
           created_by: string | null
           id: string
           is_active: boolean
+          lineage_id: string | null
           name: string
+          published_at: string | null
+          retired_at: string | null
+          status: string
           transaction_type: string
           updated_at: string
+          version: number
         }
         Insert: {
           created_at?: string
           created_by?: string | null
           id?: string
           is_active?: boolean
+          lineage_id?: string | null
           name: string
+          published_at?: string | null
+          retired_at?: string | null
+          status?: string
           transaction_type: string
           updated_at?: string
+          version?: number
         }
         Update: {
           created_at?: string
           created_by?: string | null
           id?: string
           is_active?: boolean
+          lineage_id?: string | null
           name?: string
+          published_at?: string | null
+          retired_at?: string | null
+          status?: string
           transaction_type?: string
           updated_at?: string
+          version?: number
         }
         Relationships: []
       }
-      workflow_steps: {
+      workflow_stage_participants: {
         Row: {
           created_at: string
-          default_assignee_id: string | null
-          definition_id: string
           department_id: string | null
           id: string
-          is_archive: boolean
-          is_program_manager: boolean
-          name: string
-          order_no: number
+          is_optional: boolean
+          kind: string
           role_id: string | null
+          sort_order: number
+          stage_id: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
-          default_assignee_id?: string | null
-          definition_id: string
           department_id?: string | null
           id?: string
-          is_archive?: boolean
-          is_program_manager?: boolean
-          name: string
-          order_no: number
+          is_optional?: boolean
+          kind: string
           role_id?: string | null
+          sort_order?: number
+          stage_id: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
-          default_assignee_id?: string | null
-          definition_id?: string
           department_id?: string | null
           id?: string
-          is_archive?: boolean
-          is_program_manager?: boolean
-          name?: string
-          order_no?: number
+          is_optional?: boolean
+          kind?: string
           role_id?: string | null
+          sort_order?: number
+          stage_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "workflow_steps_default_assignee_id_fkey"
-            columns: ["default_assignee_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_steps_definition_id_fkey"
-            columns: ["definition_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_definitions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_steps_department_id_fkey"
+            foreignKeyName: "workflow_stage_participants_department_id_fkey"
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "department_frequency_report"
             referencedColumns: ["department_id"]
           },
           {
-            foreignKeyName: "workflow_steps_department_id_fkey"
+            foreignKeyName: "workflow_stage_participants_department_id_fkey"
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "departments"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "workflow_steps_role_id_fkey"
+            foreignKeyName: "workflow_stage_participants_role_id_fkey"
             columns: ["role_id"]
             isOneToOne: false
             referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_stage_participants_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_stage_participants_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_stage_requirements: {
+        Row: {
+          applies_to: string
+          condition: Json | null
+          created_at: string
+          created_by: string | null
+          id: string
+          kind: string
+          message: string
+          min_attachments: number | null
+          sort_order: number
+          stage_id: string
+          updated_at: string
+        }
+        Insert: {
+          applies_to?: string
+          condition?: Json | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind: string
+          message: string
+          min_attachments?: number | null
+          sort_order?: number
+          stage_id: string
+          updated_at?: string
+        }
+        Update: {
+          applies_to?: string
+          condition?: Json | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: string
+          message?: string
+          min_attachments?: number | null
+          sort_order?: number
+          stage_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_stage_requirements_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_stages: {
+        Row: {
+          claim_policy: string
+          completion_policy: string
+          conflict_policy: string
+          created_at: string
+          created_by: string | null
+          default_next_stage_id: string | null
+          definition_id: string
+          id: string
+          is_archive: boolean
+          is_final: boolean
+          is_program_manager: boolean
+          is_start: boolean
+          join_policy: string
+          name: string
+          pos_x: number
+          pos_y: number
+          quorum_count: number | null
+          requires_receive: boolean
+          sla_minutes: number | null
+          sort_order: number
+          stage_key: string
+          updated_at: string
+        }
+        Insert: {
+          claim_policy?: string
+          completion_policy?: string
+          conflict_policy?: string
+          created_at?: string
+          created_by?: string | null
+          default_next_stage_id?: string | null
+          definition_id: string
+          id?: string
+          is_archive?: boolean
+          is_final?: boolean
+          is_program_manager?: boolean
+          is_start?: boolean
+          join_policy?: string
+          name: string
+          pos_x?: number
+          pos_y?: number
+          quorum_count?: number | null
+          requires_receive?: boolean
+          sla_minutes?: number | null
+          sort_order?: number
+          stage_key: string
+          updated_at?: string
+        }
+        Update: {
+          claim_policy?: string
+          completion_policy?: string
+          conflict_policy?: string
+          created_at?: string
+          created_by?: string | null
+          default_next_stage_id?: string | null
+          definition_id?: string
+          id?: string
+          is_archive?: boolean
+          is_final?: boolean
+          is_program_manager?: boolean
+          is_start?: boolean
+          join_policy?: string
+          name?: string
+          pos_x?: number
+          pos_y?: number
+          quorum_count?: number | null
+          requires_receive?: boolean
+          sla_minutes?: number | null
+          sort_order?: number
+          stage_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_stages_default_next_stage_id_fkey"
+            columns: ["default_next_stage_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_stages_definition_id_fkey"
+            columns: ["definition_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_definitions"
             referencedColumns: ["id"]
           },
         ]
@@ -4510,6 +5834,118 @@ export type Database = {
             columns: ["requested_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      archive_queue: {
+        Row: {
+          archive_location: string | null
+          archive_state: string | null
+          archive_submitted_at: string | null
+          archived_at: string | null
+          archived_by_name: string | null
+          closed_at: string | null
+          days_since_closed: number | null
+          project_id: string | null
+          project_name: string | null
+          subject: string | null
+          submitted_by_name: string | null
+          transaction_id: string | null
+          transaction_no: number | null
+          transaction_type: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_cost_summary"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "transactions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assignment_available_actions: {
+        Row: {
+          action_id: string | null
+          action_key: string | null
+          assignee_id: string | null
+          assignment_id: string | null
+          attachment_count: number | null
+          kind: string | null
+          label: string | null
+          requires_attachment: boolean | null
+          requires_evaluation: boolean | null
+          requires_note: boolean | null
+          return_minutes: number | null
+          routes_count: number | null
+          sort_order: number | null
+          stage_instance_id: string | null
+          transaction_id: string | null
+          unmet_requirements: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_assignments_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_assignments_stage_instance_id_fkey"
+            columns: ["stage_instance_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_stage_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_assignments_stage_instance_id_fkey"
+            columns: ["stage_instance_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_stage_progress"
+            referencedColumns: ["stage_instance_id"]
+          },
+          {
+            foreignKeyName: "transaction_assignments_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "archive_pending_report"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_assignments_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "archive_queue"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_assignments_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "overdue_transactions_report"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_assignments_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_inbox"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_assignments_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
             referencedColumns: ["id"]
           },
         ]
@@ -4561,6 +5997,7 @@ export type Database = {
         Row: {
           assignee_id: string | null
           assignee_name: string | null
+          assignment_id: string | null
           change_id: string | null
           changed_after_completion: boolean | null
           changed_at: string | null
@@ -4569,18 +6006,46 @@ export type Database = {
           delta_minutes: number | null
           new_minutes: number | null
           old_minutes: number | null
-          order_no: number | null
           project_id: string | null
           project_name: string | null
           reason: string | null
-          step_instance_id: string | null
-          step_name: string | null
+          seq: number | null
+          stage_instance_id: string | null
+          stage_name: string | null
           subject: string | null
           transaction_id: string | null
           transaction_no: number | null
           transaction_type: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "duration_change_log_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assignment_available_actions"
+            referencedColumns: ["assignment_id"]
+          },
+          {
+            foreignKeyName: "duration_change_log_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "overdue_transactions_report"
+            referencedColumns: ["assignment_id"]
+          },
+          {
+            foreignKeyName: "duration_change_log_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duration_change_log_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_inbox"
+            referencedColumns: ["assignment_id"]
+          },
           {
             foreignKeyName: "duration_change_log_changed_by_fkey"
             columns: ["changed_by"]
@@ -4589,56 +6054,56 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "duration_change_log_step_instance_id_fkey"
-            columns: ["step_instance_id"]
-            isOneToOne: false
-            referencedRelation: "overdue_transactions_report"
-            referencedColumns: ["step_instance_id"]
-          },
-          {
-            foreignKeyName: "duration_change_log_step_instance_id_fkey"
-            columns: ["step_instance_id"]
-            isOneToOne: false
-            referencedRelation: "transaction_inbox"
-            referencedColumns: ["step_instance_id"]
-          },
-          {
-            foreignKeyName: "duration_change_log_step_instance_id_fkey"
-            columns: ["step_instance_id"]
-            isOneToOne: false
-            referencedRelation: "transaction_step_instances"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "transaction_step_instances_assignee_id_fkey"
+            foreignKeyName: "transaction_assignments_assignee_id_fkey"
             columns: ["assignee_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "transaction_step_instances_transaction_id_fkey"
+            foreignKeyName: "transaction_assignments_stage_instance_id_fkey"
+            columns: ["stage_instance_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_stage_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_assignments_stage_instance_id_fkey"
+            columns: ["stage_instance_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_stage_progress"
+            referencedColumns: ["stage_instance_id"]
+          },
+          {
+            foreignKeyName: "transaction_assignments_transaction_id_fkey"
             columns: ["transaction_id"]
             isOneToOne: false
             referencedRelation: "archive_pending_report"
             referencedColumns: ["transaction_id"]
           },
           {
-            foreignKeyName: "transaction_step_instances_transaction_id_fkey"
+            foreignKeyName: "transaction_assignments_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "archive_queue"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_assignments_transaction_id_fkey"
             columns: ["transaction_id"]
             isOneToOne: false
             referencedRelation: "overdue_transactions_report"
             referencedColumns: ["transaction_id"]
           },
           {
-            foreignKeyName: "transaction_step_instances_transaction_id_fkey"
+            foreignKeyName: "transaction_assignments_transaction_id_fkey"
             columns: ["transaction_id"]
             isOneToOne: false
             referencedRelation: "transaction_inbox"
             referencedColumns: ["transaction_id"]
           },
           {
-            foreignKeyName: "transaction_step_instances_transaction_id_fkey"
+            foreignKeyName: "transaction_assignments_transaction_id_fkey"
             columns: ["transaction_id"]
             isOneToOne: false
             referencedRelation: "transactions"
@@ -4669,6 +6134,35 @@ export type Database = {
           rank_in_period: number | null
           user_id: string | null
           weighted_score: number | null
+        }
+        Relationships: []
+      }
+      evaluation_category_breakdown: {
+        Row: {
+          category_key: string | null
+          category_name: string | null
+          category_score: number | null
+          category_weight: number | null
+          period: string | null
+          sort_order: number | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
+      evaluation_period_report: {
+        Row: {
+          adjustment_points: number | null
+          base_score: number | null
+          breakdown: Json | null
+          completed_steps: number | null
+          employee_type: string | null
+          final_score: number | null
+          frozen_at: string | null
+          full_name: string | null
+          is_frozen: boolean | null
+          period: string | null
+          rank_in_period: number | null
+          user_id: string | null
         }
         Relationships: []
       }
@@ -4926,15 +6420,16 @@ export type Database = {
           arrived_at: string | null
           assignee_id: string | null
           assignee_name: string | null
+          assignment_id: string | null
           due_at: string | null
           elapsed_minutes: number | null
           elapsed_ratio: number | null
-          order_no: number | null
           project_id: string | null
           project_name: string | null
           remaining_minutes: number | null
-          step_instance_id: string | null
-          step_name: string | null
+          seq: number | null
+          stage_instance_id: string | null
+          stage_name: string | null
           subject: string | null
           transaction_id: string | null
           transaction_no: number | null
@@ -4943,11 +6438,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "transaction_step_instances_assignee_id_fkey"
+            foreignKeyName: "transaction_assignments_assignee_id_fkey"
             columns: ["assignee_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_assignments_stage_instance_id_fkey"
+            columns: ["stage_instance_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_stage_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_assignments_stage_instance_id_fkey"
+            columns: ["stage_instance_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_stage_progress"
+            referencedColumns: ["stage_instance_id"]
           },
           {
             foreignKeyName: "transactions_project_id_fkey"
@@ -5191,6 +6700,45 @@ export type Database = {
           },
         ]
       }
+      scheduled_task_status: {
+        Row: {
+          action: string | null
+          audience: Json | null
+          audience_size: number | null
+          error_runs: number | null
+          id: string | null
+          is_active: boolean | null
+          last_error: string | null
+          last_fired_at: string | null
+          last_run_at: string | null
+          last_status: string | null
+          name: string | null
+          next_run_at: string | null
+          project_id: string | null
+          project_name: string | null
+          run_count: number | null
+          schedule_kind: string | null
+          schedule_spec: Json | null
+          shift_to_workday: boolean | null
+          transaction_type: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_tasks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_cost_summary"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "scheduled_tasks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supervisor_consumption_summary: {
         Row: {
           downloads_count: number | null
@@ -5227,41 +6775,210 @@ export type Database = {
           },
         ]
       }
+      transaction_attachment_list: {
+        Row: {
+          action_log_id: string | null
+          assignment_id: string | null
+          content_type: string | null
+          created_at: string | null
+          department_id: string | null
+          department_name: string | null
+          file: Json | null
+          id: string | null
+          is_authenticated: boolean | null
+          name: string | null
+          required_permission: string | null
+          seq: number | null
+          size_bytes: number | null
+          stage_instance_id: string | null
+          stage_name: string | null
+          transaction_id: string | null
+          uploaded_by: string | null
+          uploaded_by_name: string | null
+          visibility: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_attachments_action_log_id_fkey"
+            columns: ["action_log_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_action_log"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_action_log_id_fkey"
+            columns: ["action_log_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_timeline"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assignment_available_actions"
+            referencedColumns: ["assignment_id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "overdue_transactions_report"
+            referencedColumns: ["assignment_id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_inbox"
+            referencedColumns: ["assignment_id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "department_frequency_report"
+            referencedColumns: ["department_id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_stage_instance_id_fkey"
+            columns: ["stage_instance_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_stage_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_stage_instance_id_fkey"
+            columns: ["stage_instance_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_stage_progress"
+            referencedColumns: ["stage_instance_id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "archive_pending_report"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "archive_queue"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "overdue_transactions_report"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_inbox"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transaction_inbox: {
         Row: {
           allocated_minutes: number | null
           arrived_at: string | null
           assignee_id: string | null
           assignee_name: string | null
+          assignment_id: string | null
+          assignment_status: string | null
           awaiting_duration: boolean | null
+          awaiting_receive: boolean | null
+          claim_policy: string | null
+          claimed_at: string | null
           color: string | null
           completed_at: string | null
+          completion_policy: string | null
           due_at: string | null
           elapsed_minutes: number | null
           elapsed_ratio: number | null
+          extended_minutes: number | null
+          is_archive: boolean | null
+          is_final: boolean | null
+          is_optional: boolean | null
           manager_note: string | null
-          order_no: number | null
+          notes: string | null
+          participants_count: number | null
           project_id: string | null
           project_name: string | null
+          quorum_count: number | null
+          received_at: string | null
           remaining_minutes: number | null
           requested_by: string | null
+          requester_name: string | null
           score: number | null
-          step_instance_id: string | null
-          step_name: string | null
-          step_status: string | null
+          seq: number | null
+          stage_done_count: number | null
+          stage_instance_id: string | null
+          stage_key: string | null
+          stage_name: string | null
+          stage_status: string | null
           subject: string | null
           transaction_id: string | null
           transaction_no: number | null
           transaction_status: string | null
           transaction_type: string | null
+          warnings_count: number | null
         }
         Relationships: [
           {
-            foreignKeyName: "transaction_step_instances_assignee_id_fkey"
+            foreignKeyName: "transaction_assignments_assignee_id_fkey"
             columns: ["assignee_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_assignments_stage_instance_id_fkey"
+            columns: ["stage_instance_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_stage_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_assignments_stage_instance_id_fkey"
+            columns: ["stage_instance_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_stage_progress"
+            referencedColumns: ["stage_instance_id"]
           },
           {
             foreignKeyName: "transactions_project_id_fkey"
@@ -5286,14 +7003,219 @@ export type Database = {
           },
         ]
       }
+      transaction_stage_progress: {
+        Row: {
+          avg_score: number | null
+          awaiting_duration_count: number | null
+          completed_at: string | null
+          completion_policy: string | null
+          done_count: number | null
+          entered_at: string | null
+          is_archive: boolean | null
+          is_final: boolean | null
+          participants_count: number | null
+          pending_count: number | null
+          quorum_count: number | null
+          required_count: number | null
+          requires_receive: boolean | null
+          seq: number | null
+          stage_instance_id: string | null
+          stage_key: string | null
+          stage_name: string | null
+          stage_status: string | null
+          transaction_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_stage_instances_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "archive_pending_report"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_stage_instances_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "archive_queue"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_stage_instances_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "overdue_transactions_report"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_stage_instances_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_inbox"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_stage_instances_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transaction_timeline: {
+        Row: {
+          acted_at: string | null
+          acted_by: string | null
+          acted_by_name: string | null
+          action_id: string | null
+          action_key: string | null
+          action_label: string | null
+          assignment_id: string | null
+          id: string | null
+          kind: string | null
+          notes: string | null
+          seq: number | null
+          stage_instance_id: string | null
+          stage_name: string | null
+          transaction_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_action_log_acted_by_fkey"
+            columns: ["acted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_action_log_action_id_fkey"
+            columns: ["action_id"]
+            isOneToOne: false
+            referencedRelation: "assignment_available_actions"
+            referencedColumns: ["action_id"]
+          },
+          {
+            foreignKeyName: "transaction_action_log_action_id_fkey"
+            columns: ["action_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_actions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_action_log_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assignment_available_actions"
+            referencedColumns: ["assignment_id"]
+          },
+          {
+            foreignKeyName: "transaction_action_log_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "overdue_transactions_report"
+            referencedColumns: ["assignment_id"]
+          },
+          {
+            foreignKeyName: "transaction_action_log_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_action_log_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_inbox"
+            referencedColumns: ["assignment_id"]
+          },
+          {
+            foreignKeyName: "transaction_action_log_stage_instance_id_fkey"
+            columns: ["stage_instance_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_stage_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_action_log_stage_instance_id_fkey"
+            columns: ["stage_instance_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_stage_progress"
+            referencedColumns: ["stage_instance_id"]
+          },
+          {
+            foreignKeyName: "transaction_action_log_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "archive_pending_report"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_action_log_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "archive_queue"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_action_log_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "overdue_transactions_report"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_action_log_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_inbox"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_action_log_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
+      accept_transaction_archive: {
+        Args: { p_location: string; p_notes?: string; p_transaction_id: string }
+        Returns: undefined
+      }
       account_id_by_setting: { Args: { p_key: string }; Returns: string }
+      activate_ready_joins: {
+        Args: { p_transaction_id: string }
+        Returns: number
+      }
       add_business_minutes: {
         Args: { p_from: string; p_minutes: number; p_user_id?: string }
         Returns: string
       }
+      add_transaction_attachment: {
+        Args: {
+          p_assignment_id?: string
+          p_content_type?: string
+          p_department_id?: string
+          p_file: Json
+          p_is_authenticated?: boolean
+          p_name: string
+          p_required_permission?: string
+          p_size_bytes?: number
+          p_transaction_id: string
+          p_visibility?: string
+        }
+        Returns: string
+      }
       app_timezone: { Args: never; Returns: string }
+      apply_evaluation_rules: {
+        Args: { p_period: string; p_rule_id?: string }
+        Returns: number
+      }
       approve_advance_payment: {
         Args: { p_advance_id: string }
         Returns: string
@@ -5301,6 +7223,10 @@ export type Database = {
       approve_custody: { Args: { p_custody_id: string }; Returns: string }
       approve_extract: { Args: { p_extract_id: string }; Returns: string }
       attendance_day_value: { Args: { p_status: string }; Returns: number }
+      build_transaction_context: {
+        Args: { p_transaction_id: string }
+        Returns: Json
+      }
       business_minutes_between: {
         Args: { p_from: string; p_to: string; p_user_id?: string }
         Returns: number
@@ -5313,6 +7239,10 @@ export type Database = {
       can_read_financial_reports: { Args: never; Returns: boolean }
       can_read_operational_reports: { Args: never; Returns: boolean }
       can_sign_project: { Args: { p_project_id: string }; Returns: boolean }
+      can_view_attachment: {
+        Args: { p_attachment_id: string }
+        Returns: boolean
+      }
       cancel_transaction: {
         Args: { p_transaction_id: string }
         Returns: undefined
@@ -5327,13 +7257,34 @@ export type Database = {
         }
         Returns: string
       }
+      claim_assignment: {
+        Args: { p_assignment_id: string }
+        Returns: undefined
+      }
       clear_demo_data: { Args: never; Returns: Json }
+      clear_evaluation_snapshot: {
+        Args: { p_period: string; p_reason: string }
+        Returns: number
+      }
       close_transaction: {
         Args: { p_transaction_id: string }
         Returns: undefined
       }
-      complete_step: {
-        Args: { p_notes?: string; p_step_instance_id: string }
+      complete_assignment: {
+        Args: {
+          p_action_key?: string
+          p_assignment_id: string
+          p_notes?: string
+        }
+        Returns: string
+      }
+      compute_next_run: {
+        Args: {
+          p_after?: string
+          p_kind: string
+          p_shift?: boolean
+          p_spec: Json
+        }
         Returns: string
       }
       confirm_receipt: { Args: { p_rr_id: string }; Returns: string }
@@ -5345,6 +7296,10 @@ export type Database = {
           period: string
           qty: number
         }[]
+      }
+      create_workflow_draft: {
+        Args: { p_definition_id: string }
+        Returns: string
       }
       current_permissions: { Args: never; Returns: string[] }
       current_project_ids: { Args: never; Returns: string[] }
@@ -5361,6 +7316,27 @@ export type Database = {
         }[]
       }
       demo_track: { Args: { p_entity: string; p_id: string }; Returns: string }
+      employee_period_metrics: {
+        Args: { p_period: string; p_user_id: string }
+        Returns: Json
+      }
+      eval_workflow_condition: {
+        Args: { p_condition: Json; p_context: Json; p_depth?: number }
+        Returns: boolean
+      }
+      extend_assignment_deadline: {
+        Args: {
+          p_assignment_id: string
+          p_extra_minutes: number
+          p_reason: string
+        }
+        Returns: undefined
+      }
+      fire_scheduled_task: { Args: { p_task_id: string }; Returns: string }
+      force_close_transaction: {
+        Args: { p_reason: string; p_transaction_id: string }
+        Returns: undefined
+      }
       generate_extract: {
         Args: {
           p_contractor_id: string
@@ -5380,6 +7356,7 @@ export type Database = {
         Returns: string
       }
       has_permission: { Args: { permission_key: string }; Returns: boolean }
+      has_workflow_permission: { Args: { p_key: string }; Returns: boolean }
       is_active_user: { Args: never; Returns: boolean }
       is_assigned_to_project: {
         Args: { p_project_id: string }
@@ -5399,6 +7376,10 @@ export type Database = {
         Returns: string
       }
       mark_notifications_read: { Args: { p_ids?: string[] }; Returns: number }
+      mention_in_transaction: {
+        Args: { p_action_log_id: string; p_user_ids: string[] }
+        Returns: number
+      }
       move_equipment: {
         Args: {
           p_equipment_id: string
@@ -5424,13 +7405,17 @@ export type Database = {
         }
         Returns: number
       }
-      open_step_instance: {
+      open_stage_instance: {
         Args: {
-          p_order_no: number
-          p_step_id: string
+          p_minutes_override?: number
+          p_stage_id: string
           p_transaction_id: string
         }
         Returns: string
+      }
+      populate_stage_assignments: {
+        Args: { p_instance_id: string; p_minutes_override?: number }
+        Returns: number
       }
       post_accounting_entry: {
         Args: { p_source_id: string; p_source_type: string }
@@ -5445,6 +7430,31 @@ export type Database = {
         }
         Returns: string
       }
+      preview_evaluation_rules: {
+        Args: { p_period: string; p_rule_id?: string }
+        Returns: {
+          already_applied: boolean
+          effect: string
+          employee_type: string
+          full_name: string
+          metrics: Json
+          points: number
+          reason: string
+          rule_id: string
+          rule_key: string
+          rule_name: string
+          user_id: string
+        }[]
+      }
+      preview_schedule: {
+        Args: {
+          p_count?: number
+          p_kind: string
+          p_shift?: boolean
+          p_spec: Json
+        }
+        Returns: string[]
+      }
       production_score: { Args: { p_ratio: number }; Returns: number }
       project_members: {
         Args: { p_project_id?: string }
@@ -5456,6 +7466,10 @@ export type Database = {
           user_id: string
         }[]
       }
+      publish_workflow_version: {
+        Args: { p_definition_id: string }
+        Returns: undefined
+      }
       rate_worker_production: {
         Args: {
           p_income: number
@@ -5464,6 +7478,10 @@ export type Database = {
           p_worker_id: string
         }
         Returns: string
+      }
+      receive_assignment: {
+        Args: { p_assignment_id: string }
+        Returns: undefined
       }
       record_facility_consumption: {
         Args: {
@@ -5480,6 +7498,14 @@ export type Database = {
         Args: { p_date: string; p_entries: Json; p_project_id: string }
         Returns: number
       }
+      reject_transaction_archive: {
+        Args: { p_reason: string; p_transaction_id: string }
+        Returns: undefined
+      }
+      release_assignment_claim: {
+        Args: { p_assignment_id: string; p_reason?: string }
+        Returns: undefined
+      }
       release_equipment: {
         Args: {
           p_available_to?: string
@@ -5489,11 +7515,31 @@ export type Database = {
         }
         Returns: string
       }
+      remove_transaction_attachment: {
+        Args: { p_attachment_id: string }
+        Returns: Json
+      }
+      render_template: {
+        Args: { p_context: Json; p_template: string }
+        Returns: string
+      }
       rescan_custody_duplicates: {
         Args: { p_custody_id: string }
         Returns: number
       }
-      resolve_step_assignee: { Args: { p_step_id: string }; Returns: string }
+      resolve_action_routes: {
+        Args: { p_action_id: string; p_transaction_id: string }
+        Returns: string[]
+      }
+      resolve_audience: { Args: { p_audience: Json }; Returns: string[] }
+      resolve_stage_participants: {
+        Args: { p_stage_id: string; p_transaction_id: string }
+        Returns: {
+          assignee_id: string
+          is_optional: boolean
+          participant_id: string
+        }[]
+      }
       resolve_step_duration: {
         Args: { p_transaction_type: string; p_user_id: string }
         Returns: {
@@ -5527,7 +7573,16 @@ export type Database = {
         }
         Returns: string
       }
-      run_auto_letters: { Args: never; Returns: number }
+      revoke_evaluation_rule: {
+        Args: { p_period: string; p_rule_id: string }
+        Returns: number
+      }
+      run_scheduled_task_now: { Args: { p_task_id: string }; Returns: string }
+      run_scheduled_tasks: { Args: never; Returns: number }
+      score_after_warnings: {
+        Args: { p_score: number; p_warnings: number }
+        Returns: number
+      }
       score_for_completion: {
         Args: { p_actual_minutes: number; p_allocated_minutes: number }
         Returns: number
@@ -5640,14 +7695,30 @@ export type Database = {
         }[]
       }
       seed_demo_data: { Args: { p_actor?: string }; Returns: Json }
-      set_step_duration: {
+      send_assignment_alert: {
+        Args: { p_assignment_id: string; p_kind: string; p_reason?: string }
+        Returns: string
+      }
+      set_assignment_duration: {
         Args: {
+          p_assignment_id: string
           p_minutes: number
           p_reason?: string
           p_scope?: string
-          p_step_instance_id: string
         }
         Returns: undefined
+      }
+      set_stage_positions: {
+        Args: { p_definition_id: string; p_positions: Json }
+        Returns: number
+      }
+      set_transaction_context: {
+        Args: { p_patch: Json; p_transaction_id: string }
+        Returns: undefined
+      }
+      set_user_role: {
+        Args: { p_email: string; p_role_key: string }
+        Returns: Json
       }
       set_worker_status: {
         Args: {
@@ -5660,8 +7731,10 @@ export type Database = {
         }
         Returns: string
       }
+      shift_to_workday: { Args: { p_local: string }; Returns: string }
       start_transaction: {
         Args: {
+          p_context?: Json
           p_entity_id?: string
           p_entity_type?: string
           p_project_id?: string
@@ -5669,6 +7742,10 @@ export type Database = {
           p_type: string
         }
         Returns: string
+      }
+      submit_transaction_original: {
+        Args: { p_notes?: string; p_transaction_id: string }
+        Returns: undefined
       }
       suggest_attendance: {
         Args: { p_date?: string; p_project_id: string }
@@ -5682,9 +7759,38 @@ export type Database = {
           worker_id: string
         }[]
       }
+      take_evaluation_snapshot: { Args: { p_period: string }; Returns: number }
+      transfer_assignment: {
+        Args: {
+          p_assignment_id: string
+          p_reason: string
+          p_to_user_id: string
+        }
+        Returns: string
+      }
+      transfer_targets: {
+        Args: { p_assignment_id: string }
+        Returns: {
+          full_name: string
+          user_id: string
+        }[]
+      }
+      unmet_stage_requirements: {
+        Args: { p_action_kind?: string; p_assignment_id: string }
+        Returns: {
+          kind: string
+          message: string
+          requirement_id: string
+        }[]
+      }
       users_to_notify: {
         Args: { p_permission_key: string; p_project_id?: string }
         Returns: string[]
+      }
+      validate_audience: { Args: { p_audience: Json }; Returns: boolean }
+      validate_workflow_condition: {
+        Args: { p_condition: Json; p_depth?: number }
+        Returns: boolean
       }
       waste_deviation_ratio: { Args: never; Returns: number }
     }
@@ -5705,12 +7811,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5734,11 +7840,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5759,11 +7865,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5784,11 +7890,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5801,11 +7907,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

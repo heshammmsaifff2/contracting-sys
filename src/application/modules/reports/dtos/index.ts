@@ -93,8 +93,8 @@ export interface DurationChangeRowDto {
   transactionType: string;
   subject: string;
   projectName: string;
-  stepName: string;
-  orderNo: number;
+  stageName: string;
+  seq: number;
   assigneeName: string;
   oldMinutes: number | null;
   newMinutes: number;
@@ -108,14 +108,14 @@ export interface DurationChangeRowDto {
 
 // ── 6) المعاملات المتأخّرة ──────────────────────────────────────────────
 export interface OverdueTransactionRowDto {
-  stepInstanceId: string;
+  assignmentId: string;
   transactionId: string;
   transactionNo: number;
   transactionType: string;
   subject: string;
   projectName: string;
-  stepName: string;
-  orderNo: number;
+  stageName: string;
+  seq: number;
   assigneeId: string | null;
   assigneeName: string;
   allocatedMinutes: number;

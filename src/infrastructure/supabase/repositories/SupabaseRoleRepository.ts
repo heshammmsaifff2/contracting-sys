@@ -194,7 +194,8 @@ export class SupabaseRoleRepository implements IRoleRepository {
         .select("*", { count: "exact", head: true })
         .eq("role_id", roleId);
 
-      if (error) return err(toDomainDbError(error, { entity: "مستخدمو الدور", id: roleId }));
+      if (error)
+        return err(toDomainDbError(error, { entity: "مستخدمو الدور", id: roleId }));
       return ok(count ?? 0);
     } catch (e) {
       return err(toDomainError(e, "تعذّر حساب عدد مستخدمي الدور"));

@@ -22,8 +22,24 @@ function makeRoleRepo(opts?: { isSystem?: boolean; usersCount?: number }) {
         },
       ]),
     listPermissions: async () => ok([]),
-    createRole: async () => ok({ id: "r1", key: "k", name: "n", description: null, isSystem: false, permissionKeys: [] }),
-    updateRole: async () => ok({ id: "r1", key: "k", name: "n", description: null, isSystem: false, permissionKeys: [] }),
+    createRole: async () =>
+      ok({
+        id: "r1",
+        key: "k",
+        name: "n",
+        description: null,
+        isSystem: false,
+        permissionKeys: [],
+      }),
+    updateRole: async () =>
+      ok({
+        id: "r1",
+        key: "k",
+        name: "n",
+        description: null,
+        isSystem: false,
+        permissionKeys: [],
+      }),
     deleteRole,
     getUsersCountForRole: async () => ok(usersCount),
     setRolePermissions: async () => okVoid(),

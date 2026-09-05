@@ -15,7 +15,11 @@ export class UpdateRole implements UseCase<UpdateRoleInput, RoleDto> {
   async execute(input: UpdateRoleInput): Promise<Result<RoleDto, DomainError>> {
     const name = input.name.trim();
     if (name.length < 2) {
-      return err(new ValidationError("اسم الدور مطلوب ويجب أن يتكون من حرفين على الأقل", { name: "required" }));
+      return err(
+        new ValidationError("اسم الدور مطلوب ويجب أن يتكون من حرفين على الأقل", {
+          name: "required",
+        }),
+      );
     }
 
     const description = input.description?.trim() || null;

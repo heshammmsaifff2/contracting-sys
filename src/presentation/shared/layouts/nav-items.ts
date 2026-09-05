@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  Archive,
   LayoutDashboard,
   FolderKanban,
   Users,
@@ -192,11 +193,35 @@ export const NAV_GROUPS = [
         permission: "workflow.manage",
       },
       {
+        // الطابور يخدم فاعلَين، فحارسه قراءة المعاملات لا صلاحية الأرشفة:
+        // من يودِع أصله ليس أمين الأرشيف، والقبول محروس داخل الشاشة.
+        to: "/archive",
+        label: t.nav.archiveQueue,
+        icon: Archive,
+        phase: 4,
+        permission: "transaction.read",
+      },
+      {
+        to: "/scheduled-tasks",
+        label: t.nav.scheduledTasks,
+        icon: CalendarClock,
+        phase: 4,
+        permission: "schedule.manage",
+      },
+      {
         to: "/work-calendar",
         label: t.nav.workCalendar,
         icon: CalendarClock,
         phase: 4,
         permission: "work_calendar.manage",
+      },
+      {
+        // القواعد واللقطات خلف صلاحية القراءة، والكتابة محروسة داخل الشاشة
+        to: "/evaluation-rules",
+        label: t.nav.evaluationRules,
+        icon: Scale,
+        phase: 4,
+        permission: "evaluation.read",
       },
       {
         to: "/evaluation",

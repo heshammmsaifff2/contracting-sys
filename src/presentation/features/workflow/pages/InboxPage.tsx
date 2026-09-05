@@ -4,7 +4,7 @@
  * فقط. الترتيب حسب أولوية الوصول [المراسلات 25].
  */
 import { useState } from "react";
-import { CheckCircle2, Inbox as InboxIcon, Search, Send } from "lucide-react";
+import { Inbox as InboxIcon, Search, Send } from "lucide-react";
 import type { InboxItemDto } from "@application/modules/workflow/dtos";
 import { Card } from "@presentation/shared/ui/Card";
 import { Badge } from "@presentation/shared/ui/Badge";
@@ -19,6 +19,7 @@ import { EmptyState } from "@presentation/shared/ui/EmptyState";
 import { CountdownBadge } from "@presentation/shared/ui/CountdownBadge";
 import { PermissionGate } from "@presentation/shared/ui/PermissionGate";
 import { useDebounce } from "@presentation/shared/hooks/useDebounce";
+import { ActionButtons } from "../components/ActionButtons";
 import {
   formatDateTime,
   formatDuration,
@@ -27,7 +28,7 @@ import {
 import { errorMessage } from "@presentation/shared/lib/query";
 import { useProjects } from "@presentation/features/projects/hooks/useProjects";
 import {
-  useCompleteStep,
+  useAvailableActions,
   useInbox,
   useStartTransaction,
   useTransactionSearch,
@@ -188,19 +189,8 @@ export function InboxPage() {
   const [error, setError] = useState<string | null>(null);
 
   const inbox = useInbox({ mineOnly, openOnly });
-  const complete = useCompleteStep();
-
-  async function handleComplete(item: InboxItemDto) {
-    if (!window.confirm(t.inbox.completeHint)) return;
-    setMessage(null);
-    setError(null);
-    try {
-      await complete.mutateAsync({ stepInstanceId: item.stepInstanceId, notes: "" });
-      setMessage(t.inbox.completed);
-    } catch (e) {
-      setError(errorMessage(e));
-    }
-  }
+  // الأزرار تأتي من تعريف المرحلة لا من افتراض الواجهة
+  const actions = useAvailableActions({ mineOnly });
 
   const columns: readonly Column<InboxItemDto>[] = [
     {
@@ -221,7 +211,15 @@ export function InboxPage() {
       render: (row) => (
         <span className="flex flex-col">
           <span className="text-content text-sm font-medium">{row.subject}</span>
-          <span className="text-content-muted text-[11px]">{row.stepName}</span>
+          <span className="text-content-muted text-[11px]">
+            {row.stageName}
+            {row.participantsCount > 1 ? (
+              <span className="text-content-muted mr-1 font-mono">
+                {" "}
+                · {t.inbox.sharedStage(row.stageDoneCount, row.participantsCount)}
+              </span>
+            ) : null}
+          </span>
         </span>
       ),
     },
@@ -263,7 +261,7 @@ export function InboxPage() {
           color={row.color}
           remainingMinutes={row.remainingMinutes}
           awaitingDuration={row.awaitingDuration}
-          isDone={row.stepStatus === "done"}
+          isDone={row.assignmentStatus === "done"}
         />
       ),
     },
@@ -288,20 +286,18 @@ export function InboxPage() {
     {
       key: "actions",
       header: "",
-      render: (row) =>
-        row.stepStatus === "in_progress" && !row.awaitingDuration ? (
-          <span className="flex justify-end">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void handleComplete(row)}
-              isLoading={complete.isPending}
-              startIcon={<CheckCircle2 aria-hidden className="size-4" />}
-            >
-              {t.inbox.complete}
-            </Button>
-          </span>
-        ) : null,
+      render: (row) => (
+        <span className="flex justify-end">
+          <ActionButtons
+            assignment={row}
+            actions={(actions.data ?? []).filter(
+              (a) => a.assignmentId === row.assignmentId,
+            )}
+            onMessage={setMessage}
+            onError={setError}
+          />
+        </span>
+      ),
     },
   ];
 
@@ -354,7 +350,7 @@ export function InboxPage() {
           <DataTable
             columns={columns}
             rows={inbox.data ?? []}
-            rowKey={(row) => row.stepInstanceId}
+            rowKey={(row) => row.assignmentId}
             isLoading={inbox.isPending}
             emptyTitle={t.inbox.empty}
             emptyDescription={t.inbox.emptyHint}

@@ -1,12 +1,22 @@
 /**
- * تفاصيل المعاملة: خطّ زمني للمراحل بعدّاداتها ودرجاتها.
- * مدير البرنامج يحدّد المدة أو يعدّلها حتى بعد الإنجاز [المراسلات 3، 4]،
- * وطالب المعاملة يعطي «تمام الإنجاز» فتُقفل [المراسلات 9].
+ * تفاصيل المعاملة: المراحل، ولكل مرحلة مشاركوها بعدّاداتهم ودرجاتهم.
+ *
+ * المرحلة قد تقف عند أكثر من موظف، فالعرض على مستويين: المرحلة وسياستها
+ * وتقدّمها، وتحتها كل مكلَّف بعدّاده ودرجته. مدير البرنامج يحدّد المدة أو
+ * يعدّلها حتى بعد الإنجاز [المراسلات 3، 4]، وطالب المعاملة يعطي «تمام
+ * الإنجاز» فتُقفل [المراسلات 9].
  */
 import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { CheckCircle2, Clock, Timer, XCircle } from "lucide-react";
-import type { InboxItemDto } from "@application/modules/workflow/dtos";
+import { Ban, CheckCircle2, Clock, Timer, XCircle } from "lucide-react";
+import type {
+  AvailableActionDto,
+  InboxItemDto,
+  StageDto,
+  TimelineEntryDto,
+} from "@application/modules/workflow/dtos";
+import type { ActionKind } from "@core/modules/workflow/entities/WorkflowAction";
+import type { CompletionPolicy } from "@core/modules/workflow/entities/StageInstance";
 import { Card } from "@presentation/shared/ui/Card";
 import { Badge, type BadgeTone } from "@presentation/shared/ui/Badge";
 import { Button } from "@presentation/shared/ui/Button";
@@ -26,11 +36,20 @@ import {
 } from "@presentation/shared/lib/formatters";
 import { errorMessage } from "@presentation/shared/lib/query";
 import {
+  useAvailableActions,
   useCancelTransaction,
   useCloseTransaction,
-  useSetStepDuration,
+  useSetAssignmentDuration,
   useTransaction,
+  useTransactionTimeline,
 } from "../hooks/useWorkflow";
+import { ActionButtons } from "../components/ActionButtons";
+import { AttachmentsCard } from "../components/AttachmentsCard";
+import { AssignmentTools } from "../components/AssignmentTools";
+import { TransactionMapCard } from "../components/TransactionMapCard";
+import { ArchiveCard } from "../components/ArchiveCard";
+import { useForceClose } from "../hooks/useOperations";
+import { useTransactionAttachments } from "../hooks/useAttachments";
 import { t } from "@i18n/index";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -47,9 +66,37 @@ const STATUS_TONES: Record<string, BadgeTone> = {
   cancelled: "neutral",
 };
 
-function DurationModal({ step, onClose }: { step: InboxItemDto; onClose: () => void }) {
-  const setDuration = useSetStepDuration();
-  const [minutes, setMinutes] = useState(String(step.allocatedMinutes ?? 60));
+const STAGE_TONES: Record<string, BadgeTone> = {
+  pending: "warning",
+  in_progress: "info",
+  done: "success",
+  cancelled: "neutral",
+  skipped: "neutral",
+};
+
+const KIND_TONES: Record<ActionKind, BadgeTone> = {
+  forward: "success",
+  backward: "danger",
+  note: "neutral",
+  closure: "warning",
+  final: "info",
+};
+
+const POLICY_LABELS: Record<CompletionPolicy, string> = {
+  all: t.transaction.policyAll,
+  any: t.transaction.policyAny,
+  quorum: t.transaction.policyQuorum,
+};
+
+function DurationModal({
+  assignment,
+  onClose,
+}: {
+  assignment: InboxItemDto;
+  onClose: () => void;
+}) {
+  const setDuration = useSetAssignmentDuration();
+  const [minutes, setMinutes] = useState(String(assignment.allocatedMinutes ?? 60));
   const [scope, setScope] = useState<"all_occurrences" | "single">("all_occurrences");
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +105,7 @@ function DurationModal({ step, onClose }: { step: InboxItemDto; onClose: () => v
     setError(null);
     try {
       await setDuration.mutateAsync({
-        stepInstanceId: step.stepInstanceId,
+        assignmentId: assignment.assignmentId,
         minutes: Number(minutes),
         scope,
         reason,
@@ -74,7 +121,7 @@ function DurationModal({ step, onClose }: { step: InboxItemDto; onClose: () => v
       isOpen
       onClose={onClose}
       title={t.transaction.setDurationTitle}
-      description={`${step.stepName} — ${step.assigneeName ?? ""}`}
+      description={`${assignment.stageName} — ${assignment.assigneeName ?? ""}`}
       footer={
         <>
           <Button onClick={() => void handleSave()} isLoading={setDuration.isPending}>
@@ -133,74 +180,186 @@ function DurationModal({ step, onClose }: { step: InboxItemDto; onClose: () => v
   );
 }
 
-function StepCard({
-  step,
+/** مكلَّف واحد داخل مرحلة — لكلٍّ عدّاده ودرجته. */
+function AssignmentRow({
+  assignment,
+  actions,
   onSetDuration,
+  onMessage,
+  onError,
 }: {
-  step: InboxItemDto;
-  onSetDuration: (step: InboxItemDto) => void;
+  assignment: InboxItemDto;
+  actions: readonly AvailableActionDto[];
+  onSetDuration: (assignment: InboxItemDto) => void;
+  onMessage: (message: string) => void;
+  onError: (message: string) => void;
 }) {
-  return (
-    <li className="border-border flex flex-wrap items-start gap-4 border-b py-4 last:border-0">
-      <span className="bg-surface-sunken text-content grid size-8 shrink-0 place-items-center rounded-full text-sm font-bold">
-        {formatNumber(step.orderNo)}
-      </span>
+  const isCancelled = assignment.assignmentStatus === "cancelled";
 
+  return (
+    <li
+      className={`border-border flex flex-wrap items-start gap-4 border-b py-3 last:border-0 ${
+        isCancelled ? "opacity-60" : ""
+      }`}
+    >
       <span className="min-w-0 flex-1">
-        <span className="text-content block text-sm font-medium">{step.stepName}</span>
-        <span className="text-content-muted block text-xs">
-          {step.assigneeName ?? "—"}
+        <span className="text-content flex items-center gap-2 text-sm font-medium">
+          {assignment.assigneeName ?? "—"}
+          {assignment.isOptional && (
+            <Badge tone="neutral">{t.workflowAdmin.isOptional}</Badge>
+          )}
+          {isCancelled && <Badge tone="neutral">{t.transaction.notNeeded}</Badge>}
         </span>
 
-        {step.managerNote !== "" && (
+        {assignment.managerNote !== "" && (
           <span className="text-content-muted mt-1 block text-xs">
-            {t.transaction.managerNote}: {step.managerNote}
+            {t.transaction.managerNote}: {assignment.managerNote}
+          </span>
+        )}
+        {assignment.notes !== "" && (
+          <span className="text-content-muted mt-1 block text-xs">
+            {assignment.notes}
           </span>
         )}
 
         <span className="text-content-muted mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
-          {step.arrivedAt !== null && (
+          {assignment.arrivedAt !== null && (
             <span className="tabular">
               <Clock aria-hidden className="me-1 inline size-3" />
-              {formatDateTime(step.arrivedAt)}
+              {formatDateTime(assignment.arrivedAt)}
             </span>
           )}
-          {step.allocatedMinutes !== null && (
+          {assignment.allocatedMinutes !== null && (
             <span className="tabular">
-              {t.inbox.allocated}: {formatDuration(step.allocatedMinutes)}
+              {t.inbox.allocated}: {formatDuration(assignment.allocatedMinutes)}
             </span>
           )}
           <span className="tabular">
-            {t.inbox.elapsed}: {formatDuration(step.elapsedMinutes)}
+            {t.inbox.elapsed}: {formatDuration(assignment.elapsedMinutes)}
           </span>
         </span>
       </span>
 
       <span className="flex shrink-0 flex-col items-end gap-2">
         <CountdownBadge
-          color={step.color}
-          remainingMinutes={step.remainingMinutes}
-          awaitingDuration={step.awaitingDuration}
-          isDone={step.stepStatus === "done"}
+          color={assignment.color}
+          remainingMinutes={assignment.remainingMinutes}
+          awaitingDuration={assignment.awaitingDuration}
+          isDone={assignment.assignmentStatus === "done"}
         />
 
-        {step.score !== null && (
+        {assignment.score !== null && (
           <Badge tone="brand">
-            {t.transaction.score}: {formatNumber(step.score)}
+            {t.transaction.score}: {formatNumber(assignment.score)}
           </Badge>
         )}
 
-        <PermissionGate permission="duration.manage">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onSetDuration(step)}
-            startIcon={<Timer aria-hidden className="size-4" />}
-          >
-            {t.transaction.setDuration}
-          </Button>
-        </PermissionGate>
+        {!isCancelled && (
+          <ActionButtons
+            assignment={assignment}
+            actions={actions}
+            onMessage={onMessage}
+            onError={onError}
+          />
+        )}
+
+        {!isCancelled && (
+          <AssignmentTools
+            assignment={assignment}
+            onMessage={onMessage}
+            onError={onError}
+          />
+        )}
+
+        {!isCancelled && (
+          <PermissionGate permission="duration.manage">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onSetDuration(assignment)}
+              startIcon={<Timer aria-hidden className="size-4" />}
+            >
+              {t.transaction.setDuration}
+            </Button>
+          </PermissionGate>
+        )}
       </span>
+    </li>
+  );
+}
+
+/** مرحلة بمشاركيها: العنوان يحمل السياسة والتقدّم، والقائمة تحمل المكلَّفين. */
+function StageSection({
+  stage,
+  actions,
+  onSetDuration,
+  onMessage,
+  onError,
+}: {
+  stage: StageDto;
+  actions: readonly AvailableActionDto[];
+  onSetDuration: (assignment: InboxItemDto) => void;
+  onMessage: (message: string) => void;
+  onError: (message: string) => void;
+}) {
+  return (
+    <li className="border-border border-b py-4 last:border-0">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="bg-surface-sunken text-content grid size-8 shrink-0 place-items-center rounded-full text-sm font-bold">
+          {formatNumber(stage.seq)}
+        </span>
+        <span className="text-content text-sm font-medium">{stage.stageName}</span>
+
+        <Badge tone={STAGE_TONES[stage.stageStatus] ?? "neutral"}>
+          {t.transaction.stageStatus[stage.stageStatus]}
+        </Badge>
+
+        {/* السياسة تُعرض دائمًا: هي ما يفسّر لماذا لم تُغلق المرحلة بعد */}
+        <Badge tone="neutral">
+          {POLICY_LABELS[stage.completionPolicy]}
+          {stage.completionPolicy === "quorum" && stage.quorumCount !== null
+            ? ` (${formatNumber(stage.quorumCount)})`
+            : ""}
+        </Badge>
+
+        {stage.participantsCount > 1 && (
+          <Badge tone={stage.doneCount >= stage.requiredCount ? "success" : "info"}>
+            {t.inbox.sharedStage(stage.doneCount, stage.participantsCount)}
+          </Badge>
+        )}
+
+        {stage.requiresReceive && (
+          <Badge tone="neutral">{t.workflowAdmin.requiresReceive}</Badge>
+        )}
+
+        {/* مرحلة التقاء لم يحن وقتها: لا مشاركين بعد وليست بلا مؤهّلين */}
+        {stage.stageStatus === "pending" && stage.participantsCount === 0 && (
+          <Badge tone="warning">{t.transaction.stageWaitingJoin}</Badge>
+        )}
+      </div>
+
+      {stage.assignments.length === 0 ? (
+        stage.stageStatus === "pending" ? null : (
+          <p className="text-warning mt-2 ps-11 text-xs">
+            {t.transaction.stageUnassigned}
+          </p>
+        )
+      ) : (
+        <ul className="mt-2 ps-11">
+          {stage.assignments.map((assignment) => (
+            <AssignmentRow
+              key={assignment.assignmentId}
+              assignment={assignment}
+              actions={actions.filter(
+                (a) => a.assignmentId === assignment.assignmentId,
+              )}
+              onSetDuration={onSetDuration}
+              onMessage={onMessage}
+              onError={onError}
+            />
+          ))}
+        </ul>
+      )}
     </li>
   );
 }
@@ -208,8 +367,12 @@ function StepCard({
 export function TransactionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const transaction = useTransaction(id ?? null);
+  const actions = useAvailableActions({ transactionId: id ?? "" });
+  const timeline = useTransactionTimeline(id ?? null);
+  const attachments = useTransactionAttachments(id ?? null);
   const close = useCloseTransaction();
   const cancel = useCancelTransaction();
+  const forceClose = useForceClose();
 
   const [durationTarget, setDurationTarget] = useState<InboxItemDto | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -237,12 +400,15 @@ export function TransactionDetailPage() {
     );
   }
 
-  const completedSteps = data.steps.filter((step) => step.stepStatus === "done");
-  const scored = completedSteps.filter((step) => step.score !== null);
+  const completedStages = data.stages.filter((stage) => stage.stageStatus === "done");
+  // المتوسّط عبر كل التكليفات لا المراحل: التوازي يجعل للمرحلة الواحدة عدة درجات
+  const scored = data.stages
+    .flatMap((stage) => stage.assignments)
+    .filter((assignment) => assignment.score !== null);
   const averageScore =
     scored.length === 0
       ? null
-      : scored.reduce((sum, step) => sum + (step.score ?? 0), 0) / scored.length;
+      : scored.reduce((sum, a) => sum + (a.score ?? 0), 0) / scored.length;
 
   async function handleClose() {
     if (data === null || data === undefined) return;
@@ -263,6 +429,21 @@ export function TransactionDetailPage() {
     setError(null);
     try {
       await cancel.mutateAsync(data.id);
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  }
+
+  // الإغلاق الإداري يختلف عن الإلغاء: يُعلَّم فلا يُحتسب إنجازًا
+  async function handleForceClose() {
+    if (data === null || data === undefined) return;
+    const reason = window.prompt(t.ops.forceCloseHint);
+    if (reason === null || reason.trim() === "") return;
+    setMessage(null);
+    setError(null);
+    try {
+      await forceClose.mutateAsync({ transactionId: data.id, reason });
+      setMessage(t.ops.forceClosed);
     } catch (e) {
       setError(errorMessage(e));
     }
@@ -312,6 +493,20 @@ export function TransactionDetailPage() {
               </Button>
             </PermissionGate>
           )}
+
+          {!data.isClosed && (
+            <PermissionGate permission="transaction.force_close">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => void handleForceClose()}
+                isLoading={forceClose.isPending}
+                startIcon={<Ban aria-hidden className="text-danger size-4" />}
+              >
+                {t.ops.forceClose}
+              </Button>
+            </PermissionGate>
+          )}
         </span>
       </header>
 
@@ -331,7 +526,9 @@ export function TransactionDetailPage() {
           <dt className="text-content-muted text-xs">{t.transaction.progress}</dt>
           <dd className="tabular text-content mt-0.5 text-sm font-medium">
             {formatPercent(
-              data.steps.length === 0 ? 0 : completedSteps.length / data.steps.length,
+              data.stages.length === 0
+                ? 0
+                : completedStages.length / data.stages.length,
             )}
           </dd>
         </div>
@@ -351,22 +548,68 @@ export function TransactionDetailPage() {
         </div>
       </dl>
 
-      <Card title={t.transaction.steps}>
-        <ul>
-          {data.steps.map((step) => (
-            <StepCard
-              key={step.stepInstanceId}
-              step={step}
-              onSetDuration={setDurationTarget}
-            />
-          ))}
-        </ul>
+      <Card title={t.transaction.stages}>
+        {data.stages.length === 0 ? (
+          <EmptyState title={t.workflowAdmin.noStages} />
+        ) : (
+          <ul>
+            {data.stages.map((stage) => (
+              <StageSection
+                key={stage.stageInstanceId}
+                stage={stage}
+                actions={actions.data ?? []}
+                onSetDuration={setDurationTarget}
+                onMessage={setMessage}
+                onError={setError}
+              />
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      <TransactionMapCard transaction={data} />
+
+      <ArchiveCard transaction={data} />
+
+      <AttachmentsCard
+        transactionId={data.id}
+        attachments={attachments.data ?? []}
+        openAssignments={data.stages
+          .flatMap((stage) => stage.assignments)
+          .filter((a) => a.assignmentStatus === "in_progress")}
+        isLoading={attachments.isPending}
+      />
+
+      <Card title={t.transaction.timeline} description={t.transaction.timelineHint}>
+        {(timeline.data ?? []).length === 0 ? (
+          <EmptyState title={t.transaction.noTimeline} />
+        ) : (
+          <ol className="flex flex-col gap-3">
+            {(timeline.data ?? []).map((entry: TimelineEntryDto) => (
+              <li key={entry.id} className="flex flex-wrap items-baseline gap-2">
+                <Badge tone={KIND_TONES[entry.kind]}>{entry.actionLabel}</Badge>
+                <span className="text-content text-sm">{entry.stageName ?? "—"}</span>
+                <span className="text-content-muted text-xs">
+                  {entry.actedByName ?? "—"}
+                </span>
+                <span className="tabular text-content-muted text-[11px]">
+                  {formatDateTime(entry.actedAt)}
+                </span>
+                {entry.notes !== "" && (
+                  <span className="text-content-muted basis-full text-xs">
+                    {entry.notes}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ol>
+        )}
       </Card>
 
       {durationTarget !== null && (
         <DurationModal
-          key={durationTarget.stepInstanceId}
-          step={durationTarget}
+          key={durationTarget.assignmentId}
+          assignment={durationTarget}
           onClose={() => setDurationTarget(null)}
         />
       )}

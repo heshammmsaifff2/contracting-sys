@@ -24,6 +24,9 @@ import {
   InboxPage,
   TransactionDetailPage,
   WorkflowAdminPage,
+  ArchivePage,
+  EvaluationRulesPage,
+  ScheduledTasksPage,
   WorkCalendarPage,
   EvaluationPage,
   FacilitiesPage,
@@ -156,12 +159,28 @@ export const routeTree = [
             children: [{ path: "workflow", element: <WorkflowAdminPage /> }],
           },
           {
+            element: <ProtectedRoute permission={screenPermission("/archive")} />,
+            children: [{ path: "archive", element: <ArchivePage /> }],
+          },
+          {
+            element: (
+              <ProtectedRoute permission={screenPermission("/scheduled-tasks")} />
+            ),
+            children: [{ path: "scheduled-tasks", element: <ScheduledTasksPage /> }],
+          },
+          {
             element: <ProtectedRoute permission={screenPermission("/work-calendar")} />,
             children: [{ path: "work-calendar", element: <WorkCalendarPage /> }],
           },
           {
             element: <ProtectedRoute permission={screenPermission("/evaluation")} />,
             children: [{ path: "evaluation", element: <EvaluationPage /> }],
+          },
+          {
+            element: (
+              <ProtectedRoute permission={screenPermission("/evaluation-rules")} />
+            ),
+            children: [{ path: "evaluation-rules", element: <EvaluationRulesPage /> }],
           },
           {
             element: <ProtectedRoute permission={screenPermission("/facilities")} />,

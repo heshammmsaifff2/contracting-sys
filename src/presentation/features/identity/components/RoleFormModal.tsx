@@ -67,9 +67,7 @@ export function RoleFormModal({ isOpen, onClose, role }: RoleFormModalProps) {
   const initialPermissionIds = useMemo(() => {
     if (!role || permissions.length === 0) return new Set<string>();
     return new Set(
-      permissions
-        .filter((p) => role.permissionKeys.includes(p.key))
-        .map((p) => p.id),
+      permissions.filter((p) => role.permissionKeys.includes(p.key)).map((p) => p.id),
     );
   }, [role, permissions]);
 
@@ -206,7 +204,9 @@ export function RoleFormModal({ isOpen, onClose, role }: RoleFormModalProps) {
           <FormField
             label={t.roles.key}
             required={!isEditing}
-            hint={isEditing ? "لا يمكن تعديل المفتاح التعريفي بعد الإنشاء" : t.roles.keyHint}
+            hint={
+              isEditing ? "لا يمكن تعديل المفتاح التعريفي بعد الإنشاء" : t.roles.keyHint
+            }
           >
             {(id) => (
               <Input
@@ -214,7 +214,9 @@ export function RoleFormModal({ isOpen, onClose, role }: RoleFormModalProps) {
                 dir="ltr"
                 value={key}
                 disabled={isEditing}
-                onChange={(e) => setKey(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
+                onChange={(e) =>
+                  setKey(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))
+                }
                 placeholder="site_procurement_manager"
                 required={!isEditing}
               />
@@ -235,10 +237,12 @@ export function RoleFormModal({ isOpen, onClose, role }: RoleFormModalProps) {
 
         {/* قسم الصلاحيات */}
         <div className="border-border/60 bg-surface-subtle/30 mt-2 flex flex-col gap-4 rounded-xl border p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/40 pb-3">
+          <div className="border-border/40 flex flex-wrap items-center justify-between gap-3 border-b pb-3">
             <div className="flex items-center gap-2">
               <ShieldCheck className="text-brand-600 size-5" />
-              <span className="text-content font-bold text-sm">{t.roles.permissions}</span>
+              <span className="text-content text-sm font-bold">
+                {t.roles.permissions}
+              </span>
               <Badge tone="brand">
                 {currentSelectedCount} {t.roles.selectedCount}
               </Badge>
@@ -268,7 +272,7 @@ export function RoleFormModal({ isOpen, onClose, role }: RoleFormModalProps) {
 
           {/* شريط البحث في الصلاحيات */}
           <div className="relative">
-            <Search className="text-content-muted absolute right-3 top-1/2 size-4 -translate-y-1/2" />
+            <Search className="text-content-muted absolute top-1/2 right-3 size-4 -translate-y-1/2" />
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -301,9 +305,11 @@ export function RoleFormModal({ isOpen, onClose, role }: RoleFormModalProps) {
                     key={moduleKey}
                     className="border-border/40 bg-surface/50 rounded-lg border p-3"
                   >
-                    <div className="mb-3 flex items-center justify-between border-b border-border/30 pb-2">
+                    <div className="border-border/30 mb-3 flex items-center justify-between border-b pb-2">
                       <div className="flex items-center gap-2">
-                        <h4 className="text-content font-bold text-xs">{moduleLabel}</h4>
+                        <h4 className="text-content text-xs font-bold">
+                          {moduleLabel}
+                        </h4>
                         <span className="text-content-muted text-[11px]">
                           ({moduleSelectedCount} / {items.length})
                         </span>
