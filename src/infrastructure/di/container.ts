@@ -134,6 +134,7 @@ import {
 import {
   ListWorkflowDefinitions,
   SaveWorkflowDefinition,
+  RemoveWorkflowDefinition,
   SaveWorkflowStage,
   SaveStagePositions,
   SaveStageRequirement,
@@ -493,6 +494,7 @@ export interface Container {
     readonly listScheduledTaskRuns: ListScheduledTaskRuns;
     readonly previewSchedule: PreviewSchedule;
 
+    readonly removeWorkflowDefinition: RemoveWorkflowDefinition;
     readonly saveWorkflowStage: SaveWorkflowStage;
     readonly saveStagePositions: SaveStagePositions;
     readonly saveStageRequirement: SaveStageRequirement;
@@ -855,6 +857,9 @@ export function createContainer(overrides: ContainerOverrides = {}): Container {
       listScheduledTaskRuns: new ListScheduledTaskRuns(schedulerRepository),
       previewSchedule: new PreviewSchedule(schedulerRepository),
 
+      removeWorkflowDefinition: new RemoveWorkflowDefinition(
+        workflowDefinitionRepository,
+      ),
       saveWorkflowStage: new SaveWorkflowStage(workflowDefinitionRepository),
       saveStagePositions: new SaveStagePositions(workflowDefinitionRepository),
       saveStageRequirement: new SaveStageRequirement(workflowDefinitionRepository),

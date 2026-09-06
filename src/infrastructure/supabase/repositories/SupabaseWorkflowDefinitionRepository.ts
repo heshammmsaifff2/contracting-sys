@@ -36,6 +36,7 @@ import { toDomainDbError } from "../errors";
 const SELECT_WITH_STAGES = `
   id, transaction_type, name, is_active,
   version, status, lineage_id, published_at, retired_at,
+  transactions(count),
   workflow_stages!workflow_stages_definition_id_fkey(
     id, definition_id, stage_key, name, sort_order,
     completion_policy, quorum_count,
@@ -145,6 +146,7 @@ interface DefinitionRow {
   lineage_id: string;
   published_at: string | null;
   retired_at: string | null;
+  transactions: { count: number }[] | null;
   workflow_stages: StageRow[] | null;
 }
 
@@ -190,6 +192,9 @@ function toDto(row: DefinitionRow): WorkflowDefinitionDto {
     lineageId: row.lineage_id,
     publishedAt: row.published_at,
     retiredAt: row.retired_at,
+    // العدّاد يمرّ بـ RLS، فقد يقلّ عمّا في القاعدة لمن لا يرى كل المعاملات.
+    // وهو للعرض وحده: الحارس الحقيقي في `delete_workflow_definition`.
+    transactionCount: row.transactions?.[0]?.count ?? 0,
     stages: [...(row.workflow_stages ?? [])]
       .sort((a, b) => a.sort_order - b.sort_order)
       .map((stage) => ({
@@ -393,6 +398,19 @@ export class SupabaseWorkflowDefinitionRepository implements IWorkflowDefinition
       return okVoid();
     } catch (e) {
       return err(toDomainError(e, "تعذّر حفظ مواضع المراحل"));
+    }
+  }
+
+  /** الحذف بدالّة: الحارس المجمِّد يمنع حذف مراحل المنشور بالمسار المباشر. */
+  async removeDefinition(id: string): Promise<Result<void, DomainError>> {
+    try {
+      const { error } = await this.client.rpc("delete_workflow_definition", {
+        p_definition_id: id,
+      });
+      if (error) return err(toDomainDbError(error, { entity: "المسار", id }));
+      return okVoid();
+    } catch (e) {
+      return err(toDomainError(e, "تعذّر حذف المسار"));
     }
   }
 

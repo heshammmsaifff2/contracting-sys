@@ -7261,6 +7261,7 @@ export type Database = {
         Args: { p_assignment_id: string }
         Returns: undefined
       }
+      clear_correspondence_demo: { Args: never; Returns: Json }
       clear_demo_data: { Args: never; Returns: Json }
       clear_evaluation_snapshot: {
         Args: { p_period: string; p_reason: string }
@@ -7307,6 +7308,10 @@ export type Database = {
       decide_loan: {
         Args: { p_approve: boolean; p_loan_id: string; p_note?: string }
         Returns: string
+      }
+      delete_workflow_definition: {
+        Args: { p_definition_id: string }
+        Returns: Json
       }
       demo_data_status: {
         Args: never
@@ -7694,6 +7699,7 @@ export type Database = {
           salary_type: string
         }[]
       }
+      seed_correspondence_demo: { Args: { p_actor?: string }; Returns: Json }
       seed_demo_data: { Args: { p_actor?: string }; Returns: Json }
       send_assignment_alert: {
         Args: { p_assignment_id: string; p_kind: string; p_reason?: string }

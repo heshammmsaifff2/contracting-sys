@@ -397,6 +397,8 @@ export interface WorkflowDefinitionDto {
   lineageId: string;
   publishedAt: string | null;
   retiredAt: string | null;
+  /** كم معاملة تسير على هذا الإصدار أو سارت — الحذف يُمنع بواحدة. */
+  transactionCount: number;
   stages: readonly WorkflowStageDto[];
 }
 

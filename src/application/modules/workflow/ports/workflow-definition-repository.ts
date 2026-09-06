@@ -17,6 +17,8 @@ export interface IWorkflowDefinitionRepository {
   saveDefinition(
     input: SaveWorkflowDefinitionDto,
   ): Promise<Result<WorkflowDefinitionDto, DomainError>>;
+  /** حذف تعريف بإصداره وكل ما تحته — يُرفض إن سارت عليه معاملة. */
+  removeDefinition(id: string): Promise<Result<void, DomainError>>;
   saveStage(input: SaveWorkflowStageDto): Promise<Result<void, DomainError>>;
   removeStage(id: string): Promise<Result<void, DomainError>>;
   /** مواضع عُقَد المحرّر المرئي — دفعة واحدة، وعمودا الموضع وحدهما. */

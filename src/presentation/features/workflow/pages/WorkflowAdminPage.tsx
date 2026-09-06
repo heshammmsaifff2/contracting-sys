@@ -40,6 +40,7 @@ import { Button } from "@presentation/shared/ui/Button";
 import { DataTable, type Column } from "@presentation/shared/ui/DataTable";
 import { EmptyState } from "@presentation/shared/ui/EmptyState";
 import { PermissionGate } from "@presentation/shared/ui/PermissionGate";
+import { useConfirm } from "@presentation/shared/ui/useConfirm";
 import { formatDateTime, formatDuration } from "@presentation/shared/lib/formatters";
 import { errorMessage } from "@presentation/shared/lib/query";
 import {
@@ -49,6 +50,7 @@ import {
   useRemoveActionRoute,
   useRemoveStageParticipant,
   useRemoveWorkflowAction,
+  useRemoveWorkflowDefinition,
   useRemoveWorkflowStage,
   useWorkflowDefinitions,
 } from "../hooks/useWorkflow";
@@ -238,6 +240,8 @@ function DurationChangesCard() {
 
 export function WorkflowAdminPage() {
   const definitions = useWorkflowDefinitions();
+  const confirm = useConfirm();
+  const removeDefinition = useRemoveWorkflowDefinition();
   const removeStage = useRemoveWorkflowStage();
   const removeParticipant = useRemoveStageParticipant();
   const removeAction = useRemoveWorkflowAction();
@@ -406,6 +410,46 @@ export function WorkflowAdminPage() {
                   </Button>
                 </PermissionGate>
               )}
+
+              <PermissionGate permission="workflow.manage">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label={t.workflowAdmin.deleteDefinition}
+                  title={t.workflowAdmin.deleteDefinition}
+                  onClick={() => {
+                    // معاملة واحدة تكفي للمنع: الحوار يقول السبب ولا يفتح الزرّ
+                    const isBlocked = definition.transactionCount > 0;
+                    confirm.ask({
+                      title: t.workflowAdmin.deleteDefinition,
+                      description: isBlocked
+                        ? t.workflowAdmin.deleteBlocked(definition.transactionCount)
+                        : t.workflowAdmin.deleteDefinitionHint(
+                            definition.name,
+                            definition.version,
+                          ),
+                      ...(isBlocked
+                        ? {}
+                        : {
+                            consequences: [
+                              t.workflowAdmin.deleteStagesCount(
+                                definition.stages.length,
+                              ),
+                              t.workflowAdmin.deleteRest,
+                            ],
+                            // الاسم يُكتب بيد صاحبه: الحذف يمحو المسار كلّه
+                            confirmPhrase: definition.name,
+                          }),
+                      onConfirm: () =>
+                        removeDefinition.mutateAsync({
+                          id: definition.id,
+                          transactionCount: definition.transactionCount,
+                        }),
+                    });
+                  }}
+                  startIcon={<Trash2 aria-hidden className="text-danger size-4" />}
+                />
+              </PermissionGate>
             </span>
           }
         >
@@ -491,7 +535,20 @@ export function WorkflowAdminPage() {
                           variant="ghost"
                           size="sm"
                           aria-label={t.common.delete}
-                          onClick={() => removeStage.mutate(stage.id)}
+                          onClick={() =>
+                            confirm.ask({
+                              title: t.workflowAdmin.deleteStage,
+                              description: t.workflowAdmin.deleteStageHint(stage.name),
+                              consequences: [
+                                t.workflowAdmin.deleteStageParts(
+                                  stage.participants.length,
+                                  stage.actions.length,
+                                ),
+                                t.workflowAdmin.deleteStageRoutes,
+                              ],
+                              onConfirm: () => removeStage.mutateAsync(stage.id),
+                            })
+                          }
                           startIcon={
                             <Trash2 aria-hidden className="text-danger size-4" />
                           }
@@ -523,7 +580,14 @@ export function WorkflowAdminPage() {
                               type="button"
                               aria-label={t.common.delete}
                               className="text-danger ms-1"
-                              onClick={() => removeParticipant.mutate(participant.id)}
+                              onClick={() =>
+                                confirm.ask({
+                                  title: t.workflowAdmin.deleteParticipant,
+                                  description: participantLabel(participant),
+                                  onConfirm: () =>
+                                    removeParticipant.mutateAsync(participant.id),
+                                })
+                              }
                             >
                               ×
                             </button>
@@ -626,7 +690,19 @@ export function WorkflowAdminPage() {
                                     variant="ghost"
                                     size="sm"
                                     aria-label={t.common.delete}
-                                    onClick={() => removeAction.mutate(action.id)}
+                                    onClick={() =>
+                                      confirm.ask({
+                                        title: t.workflowAdmin.deleteAction,
+                                        description: action.label,
+                                        consequences: [
+                                          t.workflowAdmin.deleteActionRoutes(
+                                            action.routes.length,
+                                          ),
+                                        ],
+                                        onConfirm: () =>
+                                          removeAction.mutateAsync(action.id),
+                                      })
+                                    }
                                     startIcon={
                                       <Trash2
                                         aria-hidden
@@ -665,7 +741,14 @@ export function WorkflowAdminPage() {
                                         type="button"
                                         aria-label={t.common.delete}
                                         className="text-danger"
-                                        onClick={() => removeRoute.mutate(route.id)}
+                                        onClick={() =>
+                                          confirm.ask({
+                                            title: t.workflowAdmin.deleteRoute,
+                                            description: `${describeCondition(route.condition)} ← ${route.targetStageName ?? "—"}`,
+                                            onConfirm: () =>
+                                              removeRoute.mutateAsync(route.id),
+                                          })
+                                        }
                                       >
                                         ×
                                       </button>
@@ -725,6 +808,8 @@ export function WorkflowAdminPage() {
           onClose={() => setActionTarget(null)}
         />
       )}
+
+      {confirm.dialog}
 
       {routeTarget !== null && (
         <RouteModal

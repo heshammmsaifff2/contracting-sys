@@ -16,6 +16,7 @@ import { FormField } from "@presentation/shared/ui/FormField";
 import { DataTable, type Column } from "@presentation/shared/ui/DataTable";
 import { EmptyState } from "@presentation/shared/ui/EmptyState";
 import { PermissionGate } from "@presentation/shared/ui/PermissionGate";
+import { useConfirm } from "@presentation/shared/ui/useConfirm";
 import { usePermission } from "@presentation/shared/hooks/usePermission";
 import { formatDate, formatDuration } from "@presentation/shared/lib/formatters";
 import { errorMessage } from "@presentation/shared/lib/query";
@@ -59,6 +60,7 @@ export function WorkCalendarPage() {
   const removeSchedule = useRemoveWorkSchedule();
   const addHoliday = useAddHoliday();
   const removeHoliday = useRemoveHoliday();
+  const confirm = useConfirm();
   const canManage = usePermission("work_calendar.manage");
 
   const [scope, setScope] = useState<"global" | "user">("global");
@@ -163,7 +165,13 @@ export function WorkCalendarPage() {
               variant="ghost"
               size="sm"
               aria-label={t.common.delete}
-              onClick={() => removeSchedule.mutate(row.id)}
+              onClick={() =>
+                confirm.ask({
+                  title: t.workCalendar.deleteSchedule,
+                  consequences: [t.workCalendar.deleteCalendarHint],
+                  onConfirm: () => removeSchedule.mutateAsync(row.id),
+                })
+              }
               startIcon={<Trash2 aria-hidden className="text-danger size-4" />}
             />
           </span>
@@ -209,7 +217,13 @@ export function WorkCalendarPage() {
               variant="ghost"
               size="sm"
               aria-label={t.common.delete}
-              onClick={() => removeHoliday.mutate(row.id)}
+              onClick={() =>
+                confirm.ask({
+                  title: t.workCalendar.deleteHoliday,
+                  consequences: [t.workCalendar.deleteCalendarHint],
+                  onConfirm: () => removeHoliday.mutateAsync(row.id),
+                })
+              }
               startIcon={<Trash2 aria-hidden className="text-danger size-4" />}
             />
           </span>

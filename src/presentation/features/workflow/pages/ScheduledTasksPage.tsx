@@ -31,6 +31,7 @@ import { FormField } from "@presentation/shared/ui/FormField";
 import { Modal } from "@presentation/shared/ui/Modal";
 import { EmptyState } from "@presentation/shared/ui/EmptyState";
 import { PermissionGate } from "@presentation/shared/ui/PermissionGate";
+import { useConfirm } from "@presentation/shared/ui/useConfirm";
 import { formatDateTime } from "@presentation/shared/lib/formatters";
 import { errorMessage } from "@presentation/shared/lib/query";
 import {
@@ -515,6 +516,7 @@ function RunsModal({ task, onClose }: { task: ScheduledTaskDto; onClose: () => v
 export function ScheduledTasksPage() {
   const tasks = useScheduledTasks();
   const remove = useRemoveScheduledTask();
+  const confirm = useConfirm();
   const runNow = useRunScheduledTaskNow();
   const roles = useRoles();
   const profiles = useProfiles();
@@ -642,7 +644,14 @@ export function ScheduledTasksPage() {
                   variant="ghost"
                   size="sm"
                   aria-label={t.common.delete}
-                  onClick={() => remove.mutate(task.id)}
+                  onClick={() =>
+                    confirm.ask({
+                      title: t.scheduler.deleteTask,
+                      description: task.name,
+                      consequences: [t.scheduler.deleteTaskHint],
+                      onConfirm: () => remove.mutateAsync(task.id),
+                    })
+                  }
                   startIcon={<Trash2 aria-hidden className="text-danger size-4" />}
                 />
               </span>

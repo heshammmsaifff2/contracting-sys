@@ -46,6 +46,7 @@ import { Badge } from "@presentation/shared/ui/Badge";
 import { Button } from "@presentation/shared/ui/Button";
 import { EmptyState } from "@presentation/shared/ui/EmptyState";
 import { PermissionGate } from "@presentation/shared/ui/PermissionGate";
+import { useConfirm } from "@presentation/shared/ui/useConfirm";
 import { formatDuration } from "@presentation/shared/lib/formatters";
 import { errorMessage } from "@presentation/shared/lib/query";
 import {
@@ -138,6 +139,7 @@ function StageInspector({
   const removeAction = useRemoveWorkflowAction();
   const removeRoute = useRemoveActionRoute();
   const removeRequirement = useRemoveStageRequirement();
+  const confirm = useConfirm();
 
   return (
     <div className="flex flex-col gap-3">
@@ -188,7 +190,13 @@ function StageInspector({
                     type="button"
                     aria-label={t.common.delete}
                     className="text-danger ms-1"
-                    onClick={() => removeParticipant.mutate(participant.id)}
+                    onClick={() =>
+                      confirm.ask({
+                        title: t.workflowAdmin.deleteParticipant,
+                        description: participantLabel(participant),
+                        onConfirm: () => removeParticipant.mutateAsync(participant.id),
+                      })
+                    }
                   >
                     ×
                   </button>
@@ -249,7 +257,13 @@ function StageInspector({
                     type="button"
                     aria-label={t.common.delete}
                     className="text-danger"
-                    onClick={() => removeRequirement.mutate(requirement.id)}
+                    onClick={() =>
+                      confirm.ask({
+                        title: t.workflowAdmin.deleteRequirement,
+                        description: requirement.message,
+                        onConfirm: () => removeRequirement.mutateAsync(requirement.id),
+                      })
+                    }
                   >
                     ×
                   </button>
@@ -314,7 +328,16 @@ function StageInspector({
                       variant="ghost"
                       size="sm"
                       aria-label={t.common.delete}
-                      onClick={() => removeAction.mutate(action.id)}
+                      onClick={() =>
+                        confirm.ask({
+                          title: t.workflowAdmin.deleteAction,
+                          description: action.label,
+                          consequences: [
+                            t.workflowAdmin.deleteActionRoutes(action.routes.length),
+                          ],
+                          onConfirm: () => removeAction.mutateAsync(action.id),
+                        })
+                      }
                       startIcon={
                         <Trash2 aria-hidden className="text-danger size-3.5" />
                       }
@@ -346,7 +369,13 @@ function StageInspector({
                           type="button"
                           aria-label={t.common.delete}
                           className="text-danger"
-                          onClick={() => removeRoute.mutate(route.id)}
+                          onClick={() =>
+                            confirm.ask({
+                              title: t.workflowAdmin.deleteRoute,
+                              description: `${describeCondition(route.condition)} ← ${route.targetStageName ?? "—"}`,
+                              onConfirm: () => removeRoute.mutateAsync(route.id),
+                            })
+                          }
                         >
                           ×
                         </button>
@@ -370,6 +399,8 @@ function StageInspector({
           </Button>
         </EditGate>
       </div>
+
+      {confirm.dialog}
     </div>
   );
 }

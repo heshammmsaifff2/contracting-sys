@@ -81,6 +81,38 @@ export class SaveWorkflowDefinition implements UseCase<
   }
 }
 
+/**
+ * حذف تعريف مسار.
+ *
+ * الحارس الحقيقي في القاعدة (معاملة واحدة تمنع)، وهذا يمنع النداء العابث
+ * قبل الشبكة ويعطي الرسالة نفسها.
+ */
+export class RemoveWorkflowDefinition implements UseCase<
+  { id: string; transactionCount: number },
+  void
+> {
+  private readonly repo: IWorkflowDefinitionRepository;
+
+  constructor(repo: IWorkflowDefinitionRepository) {
+    this.repo = repo;
+  }
+
+  async execute(input: {
+    id: string;
+    transactionCount: number;
+  }): Promise<Result<void, DomainError>> {
+    if (input.transactionCount > 0) {
+      return err(
+        new ValidationError(
+          `لا يُحذف: ${input.transactionCount} معاملة تسير على هذا الإصدار أو سارت عليه. عطّله بدل حذفه.`,
+          { transactions: "in_use" },
+        ),
+      );
+    }
+    return this.repo.removeDefinition(input.id);
+  }
+}
+
 export class SaveWorkflowStage implements UseCase<SaveWorkflowStageDto, void> {
   private readonly repo: IWorkflowDefinitionRepository;
 

@@ -246,6 +246,21 @@ export function useSaveStagePositions() {
 }
 
 /** شرط جاهزية على مرحلة [المرحلة ٠٧] — يُقاس قبل التقدّم لا بعده. */
+/** حذف تعريف مسار — يُبطل الوارد أيضًا: أنواع المعاملات المتاحة تغيّرت. */
+export function useRemoveWorkflowDefinition() {
+  const { removeWorkflowDefinition } = useUseCases();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { id: string; transactionCount: number }) =>
+      unwrap(await removeWorkflowDefinition.execute(input)),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: WORKFLOW_DEFINITIONS_KEY });
+      await queryClient.invalidateQueries({ queryKey: INBOX_KEY });
+    },
+  });
+}
+
 export function useSaveStageRequirement() {
   const { saveStageRequirement } = useUseCases();
   const queryClient = useQueryClient();

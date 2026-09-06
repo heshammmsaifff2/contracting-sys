@@ -12,6 +12,9 @@ export const ar = {
     save: "حفظ",
     cancel: "إلغاء",
     delete: "حذف",
+    confirmDelete: "هل تريد المتابعة؟ لا يمكن التراجع عن هذا الفعل.",
+    irreversible: "سيذهب معه:",
+    typeToConfirm: "اكتب الاسم للتأكيد",
     edit: "تعديل",
     add: "إضافة",
     search: "بحث",
@@ -762,6 +765,25 @@ export const ar = {
     changedBy: "عدّلها",
     changedAt: "التاريخ",
     noChanges: "لا توجد تعديلات على المدد",
+
+    deleteDefinition: "حذف المسار",
+    deleteDefinitionHint: (name: string, version: number) =>
+      `سيُحذف «${name}» الإصدار ${version} نهائيًّا.`,
+    deleteBlocked: (count: number) =>
+      `لا يُحذف: ${count} معاملة تسير على هذا الإصدار أو سارت عليه. ` +
+      `عطّله بدل حذفه ليبقى تاريخها مقروءًا.`,
+    deleteStagesCount: (count: number) => `${count} مرحلة بمشاركيها وشروطها`,
+    deleteRest: "كل الأزرار ووجهاتها الشرطية",
+    deleteStage: "حذف المرحلة",
+    deleteStageHint: (name: string) => `ستُحذف مرحلة «${name}».`,
+    deleteStageParts: (participants: number, actions: number) =>
+      `${participants} مشاركًا و${actions} زرًّا`,
+    deleteStageRoutes: "ووجهات هذه الأزرار",
+    deleteParticipant: "حذف المشارك",
+    deleteAction: "حذف الزرّ",
+    deleteActionRoutes: (count: number) => `${count} وجهة تحت هذا الزرّ`,
+    deleteRoute: "حذف الوجهة",
+    deleteRequirement: "حذف شرط الجاهزية",
   },
   workflowMap: {
     title: "خريطة المسار",
@@ -882,6 +904,8 @@ export const ar = {
     actionUpdate: "تعديل",
     actionDelete: "حذف",
     noAudit: "لا حركة مسجَّلة",
+    deleteRule: "حذف القاعدة",
+    deleteRuleHint: "التعديلات المطبَّقة على الفترات السابقة تبقى كما هي",
     auditHint: "الدرجة قرار في ملفّ موظف — ولا قرار بلا أثر",
 
     categories: "الفئات",
@@ -988,6 +1012,8 @@ export const ar = {
     subtitle: "ما يفعله النظام بنفسه: يبدأ مسارًا أو يرسل إشعارًا في موعده",
     add: "إضافة مهمة",
     createTitle: "مهمة مجدولة جديدة",
+    deleteTask: "حذف المهمة المجدولة",
+    deleteTaskHint: "سجلّ تشغيلها السابق يذهب معها — والمعاملات التي أنشأتها تبقى",
     editTitle: "تعديل المهمة",
     name: "اسم المهمة",
     isActive: "مفعّلة",
@@ -1042,6 +1068,10 @@ export const ar = {
     subtitle: "أساس العدّاد: ما خارج هذه المواعيد لا يُحتسب في المدد",
     schedules: "مواعيد الدوام",
     holidays: "الإجازات",
+    deleteSchedule: "حذف موعد الدوام",
+    deleteHoliday: "حذف الإجازة",
+    deleteCalendarHint:
+      "العدّادات تُحسب على هذا التقويم — وحذفه يغيّر مدد المعاملات الجارية",
     scope: "النطاق",
     scopeGlobal: "عام لكل الموظفين",
     scopeUser: "استثناء فردي",

@@ -35,6 +35,7 @@ import { Modal } from "@presentation/shared/ui/Modal";
 import { DataTable, type Column } from "@presentation/shared/ui/DataTable";
 import { EmptyState } from "@presentation/shared/ui/EmptyState";
 import { PermissionGate } from "@presentation/shared/ui/PermissionGate";
+import { useConfirm } from "@presentation/shared/ui/useConfirm";
 import { formatDateTime, formatNumber } from "@presentation/shared/lib/formatters";
 import { errorMessage } from "@presentation/shared/lib/query";
 import { employeeTypeLabel } from "@presentation/shared/lib/employee-type";
@@ -334,6 +335,7 @@ export function EvaluationRulesPage() {
 
   const rules = useEvaluationRules();
   const removeRule = useRemoveEvaluationRule();
+  const confirm = useConfirm();
   const preview = useRulePreview(
     tab === "preview" ? period : "",
     ruleFilter === "" ? null : ruleFilter,
@@ -418,7 +420,14 @@ export function EvaluationRulesPage() {
               variant="ghost"
               size="sm"
               aria-label={t.common.delete}
-              onClick={() => removeRule.mutate(row.id)}
+              onClick={() =>
+                confirm.ask({
+                  title: t.evalRules.deleteRule,
+                  description: row.name,
+                  consequences: [t.evalRules.deleteRuleHint],
+                  onConfirm: () => removeRule.mutateAsync(row.id),
+                })
+              }
               startIcon={<Trash2 aria-hidden className="text-danger size-4" />}
             />
           </span>
@@ -789,6 +798,8 @@ export function EvaluationRulesPage() {
           </Card>
         </PermissionGate>
       )}
+
+      {confirm.dialog}
 
       {isOpen && (
         <RuleModal
