@@ -784,6 +784,20 @@ export const ar = {
     deleteActionRoutes: (count: number) => `${count} وجهة تحت هذا الزرّ`,
     deleteRoute: "حذف الوجهة",
     deleteRequirement: "حذف شرط الجاهزية",
+
+    expand: "عرض المسار",
+    collapse: "إخفاء المسار",
+    expandAll: "عرض الكل",
+    collapseAll: "إخفاء الكل",
+    stagesCount: (count: number) =>
+      count === 0
+        ? "بلا مراحل"
+        : count === 1
+          ? "مرحلة واحدة"
+          : count === 2
+            ? "مرحلتان"
+            : `${count} مراحل`,
+    hasIssues: "فيه إشكال",
   },
   workflowMap: {
     title: "خريطة المسار",

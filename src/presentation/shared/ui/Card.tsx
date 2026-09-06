@@ -39,7 +39,10 @@ export function Card({
           {actions !== undefined && <div className="shrink-0">{actions}</div>}
         </div>
       )}
-      <div className="px-5 py-4">{children}</div>
+      {/* بلا محتوى لا حشوة: البطاقة المطويّة تبقى سطرًا واحدًا */}
+      {children !== undefined && children !== null && (
+        <div className="px-5 py-4">{children}</div>
+      )}
     </div>
   );
 }

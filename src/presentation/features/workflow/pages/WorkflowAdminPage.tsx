@@ -11,6 +11,8 @@
  */
 import { useState } from "react";
 import {
+  ChevronDown,
+  ChevronLeft,
   Copy,
   GitBranch,
   List,
@@ -33,6 +35,10 @@ import {
   isDefinitionEditable,
   type DefinitionStatus,
 } from "@core/modules/workflow/entities/WorkflowGovernance";
+import {
+  hasBlockingIssue,
+  validateWorkflowGraph,
+} from "@core/modules/workflow/entities/WorkflowGraph";
 import { describeCondition } from "@core/modules/workflow/entities/WorkflowCondition";
 import { Card } from "@presentation/shared/ui/Card";
 import { Badge } from "@presentation/shared/ui/Badge";
@@ -269,10 +275,18 @@ export function WorkflowAdminPage() {
   } | null>(null);
   // العرض لكل مسار على حدة: مسار من ثلاث مراحل لا يحتاج لوحة، والمتفرّع لا يُقرأ بدونها
   const [views, setViews] = useState<Readonly<Record<string, DefinitionView>>>({});
+  /**
+   * مطويّ افتراضًا.
+   *
+   * عشرون مسارًا مفتوحةً معًا تعني صفحةً تُمرَّر دقيقةً قبل أن تجد ما تريد.
+   * والمطويّ يبقى مقروءًا: اسمه ونوعه وحالته وعدد مراحله وهل فيه إشكال.
+   */
+  const [expanded, setExpanded] = useState<Readonly<Record<string, boolean>>>({});
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const rows = definitions.data ?? [];
+  const allOpen = rows.length > 0 && rows.every((row) => expanded[row.id] === true);
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
@@ -284,17 +298,34 @@ export function WorkflowAdminPage() {
           <p className="text-content-muted mt-1 text-sm">{t.workflowAdmin.subtitle}</p>
         </div>
 
-        <PermissionGate permission="workflow.manage">
-          <Button
-            onClick={() => {
-              setEditingDefinition(null);
-              setIsDefinitionOpen(true);
-            }}
-            startIcon={<GitBranch aria-hidden className="size-4" />}
-          >
-            {t.workflowAdmin.add}
-          </Button>
-        </PermissionGate>
+        <span className="flex flex-wrap items-center gap-2">
+          {/* مع كثرة المسارات: فتحها أو طيّها كلّها بضغطة بدل عشرين */}
+          {rows.length > 1 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                setExpanded(
+                  allOpen ? {} : Object.fromEntries(rows.map((row) => [row.id, true])),
+                )
+              }
+            >
+              {allOpen ? t.workflowAdmin.collapseAll : t.workflowAdmin.expandAll}
+            </Button>
+          )}
+
+          <PermissionGate permission="workflow.manage">
+            <Button
+              onClick={() => {
+                setEditingDefinition(null);
+                setIsDefinitionOpen(true);
+              }}
+              startIcon={<GitBranch aria-hidden className="size-4" />}
+            >
+              {t.workflowAdmin.add}
+            </Button>
+          </PermissionGate>
+        </span>
       </header>
 
       {message !== null && <p className="text-success text-sm">{message}</p>}
@@ -322,452 +353,507 @@ export function WorkflowAdminPage() {
         </Card>
       )}
 
-      {rows.map((definition) => (
-        <Card
-          key={definition.id}
-          title={
-            <span className="flex flex-wrap items-center gap-2">
-              <span>{definition.name}</span>
-              <span className="text-content-muted font-mono text-xs">
-                {definition.transactionType}
-              </span>
-              <Badge tone={STATUS_TONES[definition.status]}>
-                {STATUS_LABELS[definition.status]}
-              </Badge>
-              <span className="text-content-muted tabular text-xs">
-                {t.governance.version} {definition.version}
-              </span>
-              {definition.status === "published" && !definition.isActive && (
-                <Badge tone="neutral">{t.items.inactive}</Badge>
-              )}
-            </span>
-          }
-          actions={
-            <span className="flex flex-wrap items-center gap-1">
-              <Button
-                variant={
-                  (views[definition.id] ?? "list") === "list" ? "secondary" : "ghost"
-                }
-                size="sm"
-                onClick={() =>
-                  setViews((current) => ({ ...current, [definition.id]: "list" }))
-                }
-                startIcon={<List aria-hidden className="size-4" />}
-              >
-                {t.workflowMap.viewList}
-              </Button>
-              <Button
-                variant={
-                  (views[definition.id] ?? "list") === "map" ? "secondary" : "ghost"
-                }
-                size="sm"
-                onClick={() =>
-                  setViews((current) => ({ ...current, [definition.id]: "map" }))
-                }
-                startIcon={<MapIcon aria-hidden className="size-4" />}
-              >
-                {t.workflowMap.viewMap}
-              </Button>
+      {rows.map((definition) => {
+        const isOpen = expanded[definition.id] ?? false;
+        // الفحص نقيّ وسريع، ويُغني عن فتح المسار لمعرفة أنّ فيه عطبًا
+        const isBroken = hasBlockingIssue(validateWorkflowGraph(definition.stages));
 
-              <VersionActions
-                definition={definition}
-                onMessage={(text) => {
-                  setError(null);
-                  setMessage(text);
-                }}
-                onError={(text) => {
-                  setMessage(null);
-                  setError(text);
-                }}
-              />
+        return (
+          <Card
+            key={definition.id}
+            title={
+              <span className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  aria-expanded={isOpen}
+                  aria-label={
+                    isOpen ? t.workflowAdmin.collapse : t.workflowAdmin.expand
+                  }
+                  title={isOpen ? t.workflowAdmin.collapse : t.workflowAdmin.expand}
+                  onClick={() =>
+                    setExpanded((current) => ({
+                      ...current,
+                      [definition.id]: !isOpen,
+                    }))
+                  }
+                  className="text-content-muted hover:text-content -m-1 p-1"
+                >
+                  {isOpen ? (
+                    <ChevronDown aria-hidden className="size-4" />
+                  ) : (
+                    <ChevronLeft aria-hidden className="size-4" />
+                  )}
+                </button>
 
-              {isDefinitionEditable(definition.status) && (
-                <PermissionGate permission="workflow.manage">
+                <span>{definition.name}</span>
+                <span className="text-content-muted font-mono text-xs">
+                  {definition.transactionType}
+                </span>
+                <Badge tone={STATUS_TONES[definition.status]}>
+                  {STATUS_LABELS[definition.status]}
+                </Badge>
+                <span className="text-content-muted tabular text-xs">
+                  {t.governance.version} {definition.version}
+                </span>
+                {definition.status === "published" && !definition.isActive && (
+                  <Badge tone="neutral">{t.items.inactive}</Badge>
+                )}
+
+                {/* ما يُغني عن الفتح: عدد المراحل، وهل في المسار عطب */}
+                <span className="text-content-muted text-xs font-normal">
+                  {t.workflowAdmin.stagesCount(definition.stages.length)}
+                </span>
+                {isBroken && <Badge tone="danger">{t.workflowAdmin.hasIssues}</Badge>}
+              </span>
+            }
+            actions={
+              !isOpen ? undefined : (
+                <span className="flex flex-wrap items-center gap-1">
                   <Button
-                    variant="ghost"
-                    size="sm"
-                    aria-label={t.common.edit}
-                    onClick={() => {
-                      setEditingDefinition(definition);
-                      setIsDefinitionOpen(true);
-                    }}
-                    startIcon={<Pencil aria-hidden className="size-4" />}
-                  />
-                  <Button
-                    variant="ghost"
+                    variant={
+                      (views[definition.id] ?? "list") === "list"
+                        ? "secondary"
+                        : "ghost"
+                    }
                     size="sm"
                     onClick={() =>
-                      setStageTarget({
-                        definitionId: definition.id,
-                        stage: null,
-                        siblings: definition.stages,
-                        nextOrder: definition.stages.length + 1,
-                      })
+                      setViews((current) => ({ ...current, [definition.id]: "list" }))
                     }
-                    startIcon={<Plus aria-hidden className="size-4" />}
+                    startIcon={<List aria-hidden className="size-4" />}
                   >
-                    {t.workflowAdmin.addStage}
+                    {t.workflowMap.viewList}
                   </Button>
-                </PermissionGate>
-              )}
+                  <Button
+                    variant={
+                      (views[definition.id] ?? "list") === "map" ? "secondary" : "ghost"
+                    }
+                    size="sm"
+                    onClick={() =>
+                      setViews((current) => ({ ...current, [definition.id]: "map" }))
+                    }
+                    startIcon={<MapIcon aria-hidden className="size-4" />}
+                  >
+                    {t.workflowMap.viewMap}
+                  </Button>
 
-              <PermissionGate permission="workflow.manage">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  aria-label={t.workflowAdmin.deleteDefinition}
-                  title={t.workflowAdmin.deleteDefinition}
-                  onClick={() => {
-                    // معاملة واحدة تكفي للمنع: الحوار يقول السبب ولا يفتح الزرّ
-                    const isBlocked = definition.transactionCount > 0;
-                    confirm.ask({
-                      title: t.workflowAdmin.deleteDefinition,
-                      description: isBlocked
-                        ? t.workflowAdmin.deleteBlocked(definition.transactionCount)
-                        : t.workflowAdmin.deleteDefinitionHint(
-                            definition.name,
-                            definition.version,
-                          ),
-                      ...(isBlocked
-                        ? {}
-                        : {
-                            consequences: [
-                              t.workflowAdmin.deleteStagesCount(
-                                definition.stages.length,
-                              ),
-                              t.workflowAdmin.deleteRest,
-                            ],
-                            // الاسم يُكتب بيد صاحبه: الحذف يمحو المسار كلّه
-                            confirmPhrase: definition.name,
-                          }),
-                      onConfirm: () =>
-                        removeDefinition.mutateAsync({
-                          id: definition.id,
-                          transactionCount: definition.transactionCount,
-                        }),
-                    });
-                  }}
-                  startIcon={<Trash2 aria-hidden className="text-danger size-4" />}
-                />
-              </PermissionGate>
-            </span>
-          }
-        >
-          {!isDefinitionEditable(definition.status) && (
-            <p className="border-border bg-surface-sunken text-content-muted mb-3 flex items-start gap-2 rounded-[var(--radius-control)] border p-2 text-xs">
-              <Lock aria-hidden className="mt-0.5 size-3.5 shrink-0" />
-              <span>
-                <span className="text-content font-medium">{t.governance.frozen}</span>{" "}
-                — {t.governance.frozenHint}
-              </span>
-            </p>
-          )}
+                  <VersionActions
+                    definition={definition}
+                    onMessage={(text) => {
+                      setError(null);
+                      setMessage(text);
+                    }}
+                    onError={(text) => {
+                      setMessage(null);
+                      setError(text);
+                    }}
+                  />
 
-          {(views[definition.id] ?? "list") === "map" ? (
-            <WorkflowMapEditor definition={definition} />
-          ) : definition.stages.length === 0 ? (
-            <EmptyState title={t.workflowAdmin.noStages} />
-          ) : (
-            <ul className="divide-border divide-y">
-              {definition.stages.map((stage) => (
-                <li key={stage.id} className="py-3">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="bg-surface-sunken text-content grid size-7 shrink-0 place-items-center rounded-full text-xs font-bold">
-                      {stage.sortOrder}
-                    </span>
-
-                    <span className="min-w-0 flex-1">
-                      <span className="text-content block text-sm font-medium">
-                        {stage.name}
-                        <span className="text-content-muted ms-2 font-mono text-[11px]">
-                          {stage.stageKey}
-                        </span>
-                      </span>
-                      <span className="text-content-muted block text-xs">
-                        {stage.defaultNextStageName === null
-                          ? t.workflowAdmin.noNextStage
-                          : `${t.workflowAdmin.nextStage}: ${stage.defaultNextStageName}`}
-                        {stage.slaMinutes !== null &&
-                          ` · ${t.inbox.allocated}: ${formatDuration(stage.slaMinutes)}`}
-                      </span>
-                    </span>
-
-                    <Badge tone="neutral">
-                      {stage.completionPolicy === "all"
-                        ? t.workflowAdmin.policyAll
-                        : stage.completionPolicy === "any"
-                          ? t.workflowAdmin.policyAny
-                          : `${t.workflowAdmin.policyQuorum} (${stage.quorumCount ?? 0})`}
-                    </Badge>
-                    {stage.isStart && (
-                      <Badge tone="success">{t.workflowAdmin.isStart}</Badge>
-                    )}
-                    {stage.isFinal && (
-                      <Badge tone="info">{t.workflowAdmin.isFinal}</Badge>
-                    )}
-                    {stage.isProgramManager && (
-                      <Badge tone="brand">{t.workflowAdmin.isProgramManager}</Badge>
-                    )}
-                    {stage.isArchive && (
-                      <Badge tone="info">{t.workflowAdmin.isArchive}</Badge>
-                    )}
-                    {stage.requiresReceive && (
-                      <Badge tone="neutral">{t.workflowAdmin.requiresReceive}</Badge>
-                    )}
-
-                    <PermissionGate permission="workflow.manage">
-                      <span className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          aria-label={t.common.edit}
-                          onClick={() =>
-                            setStageTarget({
-                              definitionId: definition.id,
-                              stage,
-                              siblings: definition.stages,
-                              nextOrder: stage.sortOrder,
-                            })
-                          }
-                          startIcon={<Pencil aria-hidden className="size-4" />}
-                        />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          aria-label={t.common.delete}
-                          onClick={() =>
-                            confirm.ask({
-                              title: t.workflowAdmin.deleteStage,
-                              description: t.workflowAdmin.deleteStageHint(stage.name),
-                              consequences: [
-                                t.workflowAdmin.deleteStageParts(
-                                  stage.participants.length,
-                                  stage.actions.length,
-                                ),
-                                t.workflowAdmin.deleteStageRoutes,
-                              ],
-                              onConfirm: () => removeStage.mutateAsync(stage.id),
-                            })
-                          }
-                          startIcon={
-                            <Trash2 aria-hidden className="text-danger size-4" />
-                          }
-                        />
-                      </span>
-                    </PermissionGate>
-                  </div>
-
-                  {/* المشاركون: أكثر من واحد = المرحلة عند أكثر من موظف */}
-                  <div className="mt-2 flex flex-wrap items-center gap-2 ps-10">
-                    <Users
-                      aria-hidden
-                      className="text-content-muted size-3.5 shrink-0"
-                    />
-                    {stage.participants.length === 0 ? (
-                      <span className="text-warning text-xs">
-                        {t.workflowAdmin.noParticipants}
-                      </span>
-                    ) : (
-                      stage.participants.map((participant) => (
-                        <span
-                          key={participant.id}
-                          className="border-border text-content-muted flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px]"
-                        >
-                          {participantLabel(participant)}
-                          {participant.isOptional && ` · ${t.workflowAdmin.isOptional}`}
-                          <PermissionGate permission="workflow.manage">
-                            <button
-                              type="button"
-                              aria-label={t.common.delete}
-                              className="text-danger ms-1"
-                              onClick={() =>
-                                confirm.ask({
-                                  title: t.workflowAdmin.deleteParticipant,
-                                  description: participantLabel(participant),
-                                  onConfirm: () =>
-                                    removeParticipant.mutateAsync(participant.id),
-                                })
-                              }
-                            >
-                              ×
-                            </button>
-                          </PermissionGate>
-                        </span>
-                      ))
-                    )}
-
+                  {isDefinitionEditable(definition.status) && (
                     <PermissionGate permission="workflow.manage">
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setParticipantTarget(stage)}
-                        startIcon={<Plus aria-hidden className="size-3.5" />}
+                        aria-label={t.common.edit}
+                        onClick={() => {
+                          setEditingDefinition(definition);
+                          setIsDefinitionOpen(true);
+                        }}
+                        startIcon={<Pencil aria-hidden className="size-4" />}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          setStageTarget({
+                            definitionId: definition.id,
+                            stage: null,
+                            siblings: definition.stages,
+                            nextOrder: definition.stages.length + 1,
+                          })
+                        }
+                        startIcon={<Plus aria-hidden className="size-4" />}
                       >
-                        {t.workflowAdmin.addParticipant}
+                        {t.workflowAdmin.addStage}
                       </Button>
                     </PermissionGate>
-                  </div>
+                  )}
 
-                  {/* الأزرار ووجهاتها المشروطة — هنا يقع التفريع */}
-                  <div className="mt-2 ps-10">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <GitBranch
-                        aria-hidden
-                        className="text-content-muted size-3.5 shrink-0"
-                      />
-                      {stage.actions.length === 0 && (
-                        <span className="text-content-muted text-xs">
-                          {t.workflowAdmin.noActionsYet}
-                        </span>
-                      )}
-                      <PermissionGate permission="workflow.manage">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setActionTarget({ stage, action: null })}
-                          startIcon={<Plus aria-hidden className="size-3.5" />}
-                        >
-                          {t.workflowAdmin.addAction}
-                        </Button>
-                      </PermissionGate>
-                    </div>
+                  <PermissionGate permission="workflow.manage">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={t.workflowAdmin.deleteDefinition}
+                      title={t.workflowAdmin.deleteDefinition}
+                      onClick={() => {
+                        // معاملة واحدة تكفي للمنع: الحوار يقول السبب ولا يفتح الزرّ
+                        const isBlocked = definition.transactionCount > 0;
+                        confirm.ask({
+                          title: t.workflowAdmin.deleteDefinition,
+                          description: isBlocked
+                            ? t.workflowAdmin.deleteBlocked(definition.transactionCount)
+                            : t.workflowAdmin.deleteDefinitionHint(
+                                definition.name,
+                                definition.version,
+                              ),
+                          ...(isBlocked
+                            ? {}
+                            : {
+                                consequences: [
+                                  t.workflowAdmin.deleteStagesCount(
+                                    definition.stages.length,
+                                  ),
+                                  t.workflowAdmin.deleteRest,
+                                ],
+                                // الاسم يُكتب بيد صاحبه: الحذف يمحو المسار كلّه
+                                confirmPhrase: definition.name,
+                              }),
+                          onConfirm: () =>
+                            removeDefinition.mutateAsync({
+                              id: definition.id,
+                              transactionCount: definition.transactionCount,
+                            }),
+                        });
+                      }}
+                      startIcon={<Trash2 aria-hidden className="text-danger size-4" />}
+                    />
+                  </PermissionGate>
+                </span>
+              )
+            }
+          >
+            {!isOpen ? null : (
+              <>
+                {!isDefinitionEditable(definition.status) && (
+                  <p className="border-border bg-surface-sunken text-content-muted mb-3 flex items-start gap-2 rounded-[var(--radius-control)] border p-2 text-xs">
+                    <Lock aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+                    <span>
+                      <span className="text-content font-medium">
+                        {t.governance.frozen}
+                      </span>{" "}
+                      — {t.governance.frozenHint}
+                    </span>
+                  </p>
+                )}
 
-                    {stage.actions.length > 0 && (
-                      <ul className="mt-1 flex flex-col gap-1.5">
-                        {stage.actions.map((action) => (
-                          <li
-                            key={action.id}
-                            className="border-border rounded-[var(--radius-control)] border px-2 py-1.5"
-                          >
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Badge tone={ACTION_KIND_TONES[action.kind]}>
-                                {action.label}
-                              </Badge>
-                              <span className="text-content-muted font-mono text-[11px]">
-                                {action.actionKey}
+                {(views[definition.id] ?? "list") === "map" ? (
+                  <WorkflowMapEditor definition={definition} />
+                ) : definition.stages.length === 0 ? (
+                  <EmptyState title={t.workflowAdmin.noStages} />
+                ) : (
+                  <ul className="divide-border divide-y">
+                    {definition.stages.map((stage) => (
+                      <li key={stage.id} className="py-3">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className="bg-surface-sunken text-content grid size-7 shrink-0 place-items-center rounded-full text-xs font-bold">
+                            {stage.sortOrder}
+                          </span>
+
+                          <span className="min-w-0 flex-1">
+                            <span className="text-content block text-sm font-medium">
+                              {stage.name}
+                              <span className="text-content-muted ms-2 font-mono text-[11px]">
+                                {stage.stageKey}
                               </span>
-                              {action.requiresNote && (
-                                <span className="text-content-muted text-[11px]">
-                                  · {t.workflowAdmin.requiresNote}
-                                </span>
-                              )}
-                              {action.returnMinutes !== null && (
-                                <span className="text-content-muted text-[11px]">
-                                  · {t.workflowAdmin.returnMinutes}:{" "}
-                                  {formatDuration(action.returnMinutes)}
-                                </span>
-                              )}
+                            </span>
+                            <span className="text-content-muted block text-xs">
+                              {stage.defaultNextStageName === null
+                                ? t.workflowAdmin.noNextStage
+                                : `${t.workflowAdmin.nextStage}: ${stage.defaultNextStageName}`}
+                              {stage.slaMinutes !== null &&
+                                ` · ${t.inbox.allocated}: ${formatDuration(stage.slaMinutes)}`}
+                            </span>
+                          </span>
 
-                              <PermissionGate permission="workflow.manage">
-                                <span className="ms-auto flex gap-1">
-                                  {actionCarriesRoutes(action.kind) && (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() =>
-                                        setRouteTarget({
-                                          action,
-                                          siblings: definition.stages,
-                                        })
-                                      }
-                                      startIcon={
-                                        <Plus aria-hidden className="size-3.5" />
-                                      }
-                                    >
-                                      {t.workflowAdmin.addRoute}
-                                    </Button>
-                                  )}
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    aria-label={t.common.edit}
-                                    onClick={() => setActionTarget({ stage, action })}
-                                    startIcon={
-                                      <Pencil aria-hidden className="size-3.5" />
-                                    }
-                                  />
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
+                          <Badge tone="neutral">
+                            {stage.completionPolicy === "all"
+                              ? t.workflowAdmin.policyAll
+                              : stage.completionPolicy === "any"
+                                ? t.workflowAdmin.policyAny
+                                : `${t.workflowAdmin.policyQuorum} (${stage.quorumCount ?? 0})`}
+                          </Badge>
+                          {stage.isStart && (
+                            <Badge tone="success">{t.workflowAdmin.isStart}</Badge>
+                          )}
+                          {stage.isFinal && (
+                            <Badge tone="info">{t.workflowAdmin.isFinal}</Badge>
+                          )}
+                          {stage.isProgramManager && (
+                            <Badge tone="brand">
+                              {t.workflowAdmin.isProgramManager}
+                            </Badge>
+                          )}
+                          {stage.isArchive && (
+                            <Badge tone="info">{t.workflowAdmin.isArchive}</Badge>
+                          )}
+                          {stage.requiresReceive && (
+                            <Badge tone="neutral">
+                              {t.workflowAdmin.requiresReceive}
+                            </Badge>
+                          )}
+
+                          <PermissionGate permission="workflow.manage">
+                            <span className="flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                aria-label={t.common.edit}
+                                onClick={() =>
+                                  setStageTarget({
+                                    definitionId: definition.id,
+                                    stage,
+                                    siblings: definition.stages,
+                                    nextOrder: stage.sortOrder,
+                                  })
+                                }
+                                startIcon={<Pencil aria-hidden className="size-4" />}
+                              />
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                aria-label={t.common.delete}
+                                onClick={() =>
+                                  confirm.ask({
+                                    title: t.workflowAdmin.deleteStage,
+                                    description: t.workflowAdmin.deleteStageHint(
+                                      stage.name,
+                                    ),
+                                    consequences: [
+                                      t.workflowAdmin.deleteStageParts(
+                                        stage.participants.length,
+                                        stage.actions.length,
+                                      ),
+                                      t.workflowAdmin.deleteStageRoutes,
+                                    ],
+                                    onConfirm: () => removeStage.mutateAsync(stage.id),
+                                  })
+                                }
+                                startIcon={
+                                  <Trash2 aria-hidden className="text-danger size-4" />
+                                }
+                              />
+                            </span>
+                          </PermissionGate>
+                        </div>
+
+                        {/* المشاركون: أكثر من واحد = المرحلة عند أكثر من موظف */}
+                        <div className="mt-2 flex flex-wrap items-center gap-2 ps-10">
+                          <Users
+                            aria-hidden
+                            className="text-content-muted size-3.5 shrink-0"
+                          />
+                          {stage.participants.length === 0 ? (
+                            <span className="text-warning text-xs">
+                              {t.workflowAdmin.noParticipants}
+                            </span>
+                          ) : (
+                            stage.participants.map((participant) => (
+                              <span
+                                key={participant.id}
+                                className="border-border text-content-muted flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px]"
+                              >
+                                {participantLabel(participant)}
+                                {participant.isOptional &&
+                                  ` · ${t.workflowAdmin.isOptional}`}
+                                <PermissionGate permission="workflow.manage">
+                                  <button
+                                    type="button"
                                     aria-label={t.common.delete}
+                                    className="text-danger ms-1"
                                     onClick={() =>
                                       confirm.ask({
-                                        title: t.workflowAdmin.deleteAction,
-                                        description: action.label,
-                                        consequences: [
-                                          t.workflowAdmin.deleteActionRoutes(
-                                            action.routes.length,
-                                          ),
-                                        ],
+                                        title: t.workflowAdmin.deleteParticipant,
+                                        description: participantLabel(participant),
                                         onConfirm: () =>
-                                          removeAction.mutateAsync(action.id),
+                                          removeParticipant.mutateAsync(participant.id),
                                       })
                                     }
-                                    startIcon={
-                                      <Trash2
-                                        aria-hidden
-                                        className="text-danger size-3.5"
-                                      />
-                                    }
-                                  />
-                                </span>
-                              </PermissionGate>
-                            </div>
-
-                            {/* زرّ بلا وجهة يوقف المسار عنده */}
-                            {actionCarriesRoutes(action.kind) &&
-                              action.routes.length === 0 && (
-                                <p className="text-warning mt-1 text-[11px]">
-                                  {t.workflowAdmin.noRoutes}
-                                </p>
-                              )}
-
-                            {action.routes.length > 0 && (
-                              <ul className="mt-1 flex flex-col gap-0.5">
-                                {action.routes.map((route) => (
-                                  <li
-                                    key={route.id}
-                                    className="text-content-muted flex flex-wrap items-baseline gap-2 text-[11px]"
                                   >
-                                    <span className="tabular font-mono">
-                                      #{route.priority}
-                                    </span>
-                                    <span>{describeCondition(route.condition)}</span>
-                                    <span className="text-content">
-                                      ← {route.targetStageName ?? "—"}
-                                    </span>
-                                    <PermissionGate permission="workflow.manage">
-                                      <button
-                                        type="button"
-                                        aria-label={t.common.delete}
-                                        className="text-danger"
-                                        onClick={() =>
-                                          confirm.ask({
-                                            title: t.workflowAdmin.deleteRoute,
-                                            description: `${describeCondition(route.condition)} ← ${route.targetStageName ?? "—"}`,
-                                            onConfirm: () =>
-                                              removeRoute.mutateAsync(route.id),
-                                          })
-                                        }
-                                      >
-                                        ×
-                                      </button>
-                                    </PermissionGate>
-                                  </li>
-                                ))}
-                              </ul>
+                                    ×
+                                  </button>
+                                </PermissionGate>
+                              </span>
+                            ))
+                          )}
+
+                          <PermissionGate permission="workflow.manage">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setParticipantTarget(stage)}
+                              startIcon={<Plus aria-hidden className="size-3.5" />}
+                            >
+                              {t.workflowAdmin.addParticipant}
+                            </Button>
+                          </PermissionGate>
+                        </div>
+
+                        {/* الأزرار ووجهاتها المشروطة — هنا يقع التفريع */}
+                        <div className="mt-2 ps-10">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <GitBranch
+                              aria-hidden
+                              className="text-content-muted size-3.5 shrink-0"
+                            />
+                            {stage.actions.length === 0 && (
+                              <span className="text-content-muted text-xs">
+                                {t.workflowAdmin.noActionsYet}
+                              </span>
                             )}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      ))}
+                            <PermissionGate permission="workflow.manage">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setActionTarget({ stage, action: null })}
+                                startIcon={<Plus aria-hidden className="size-3.5" />}
+                              >
+                                {t.workflowAdmin.addAction}
+                              </Button>
+                            </PermissionGate>
+                          </div>
+
+                          {stage.actions.length > 0 && (
+                            <ul className="mt-1 flex flex-col gap-1.5">
+                              {stage.actions.map((action) => (
+                                <li
+                                  key={action.id}
+                                  className="border-border rounded-[var(--radius-control)] border px-2 py-1.5"
+                                >
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <Badge tone={ACTION_KIND_TONES[action.kind]}>
+                                      {action.label}
+                                    </Badge>
+                                    <span className="text-content-muted font-mono text-[11px]">
+                                      {action.actionKey}
+                                    </span>
+                                    {action.requiresNote && (
+                                      <span className="text-content-muted text-[11px]">
+                                        · {t.workflowAdmin.requiresNote}
+                                      </span>
+                                    )}
+                                    {action.returnMinutes !== null && (
+                                      <span className="text-content-muted text-[11px]">
+                                        · {t.workflowAdmin.returnMinutes}:{" "}
+                                        {formatDuration(action.returnMinutes)}
+                                      </span>
+                                    )}
+
+                                    <PermissionGate permission="workflow.manage">
+                                      <span className="ms-auto flex gap-1">
+                                        {actionCarriesRoutes(action.kind) && (
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() =>
+                                              setRouteTarget({
+                                                action,
+                                                siblings: definition.stages,
+                                              })
+                                            }
+                                            startIcon={
+                                              <Plus aria-hidden className="size-3.5" />
+                                            }
+                                          >
+                                            {t.workflowAdmin.addRoute}
+                                          </Button>
+                                        )}
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          aria-label={t.common.edit}
+                                          onClick={() =>
+                                            setActionTarget({ stage, action })
+                                          }
+                                          startIcon={
+                                            <Pencil aria-hidden className="size-3.5" />
+                                          }
+                                        />
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          aria-label={t.common.delete}
+                                          onClick={() =>
+                                            confirm.ask({
+                                              title: t.workflowAdmin.deleteAction,
+                                              description: action.label,
+                                              consequences: [
+                                                t.workflowAdmin.deleteActionRoutes(
+                                                  action.routes.length,
+                                                ),
+                                              ],
+                                              onConfirm: () =>
+                                                removeAction.mutateAsync(action.id),
+                                            })
+                                          }
+                                          startIcon={
+                                            <Trash2
+                                              aria-hidden
+                                              className="text-danger size-3.5"
+                                            />
+                                          }
+                                        />
+                                      </span>
+                                    </PermissionGate>
+                                  </div>
+
+                                  {/* زرّ بلا وجهة يوقف المسار عنده */}
+                                  {actionCarriesRoutes(action.kind) &&
+                                    action.routes.length === 0 && (
+                                      <p className="text-warning mt-1 text-[11px]">
+                                        {t.workflowAdmin.noRoutes}
+                                      </p>
+                                    )}
+
+                                  {action.routes.length > 0 && (
+                                    <ul className="mt-1 flex flex-col gap-0.5">
+                                      {action.routes.map((route) => (
+                                        <li
+                                          key={route.id}
+                                          className="text-content-muted flex flex-wrap items-baseline gap-2 text-[11px]"
+                                        >
+                                          <span className="tabular font-mono">
+                                            #{route.priority}
+                                          </span>
+                                          <span>
+                                            {describeCondition(route.condition)}
+                                          </span>
+                                          <span className="text-content">
+                                            ← {route.targetStageName ?? "—"}
+                                          </span>
+                                          <PermissionGate permission="workflow.manage">
+                                            <button
+                                              type="button"
+                                              aria-label={t.common.delete}
+                                              className="text-danger"
+                                              onClick={() =>
+                                                confirm.ask({
+                                                  title: t.workflowAdmin.deleteRoute,
+                                                  description: `${describeCondition(route.condition)} ← ${route.targetStageName ?? "—"}`,
+                                                  onConfirm: () =>
+                                                    removeRoute.mutateAsync(route.id),
+                                                })
+                                              }
+                                            >
+                                              ×
+                                            </button>
+                                          </PermissionGate>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            )}
+          </Card>
+        );
+      })}
 
       <PermissionGate permission="duration.manage">
         <DurationChangesCard />
