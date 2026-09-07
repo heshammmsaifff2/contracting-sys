@@ -18,6 +18,8 @@ export interface ConfirmRequest {
   /** يُطلَب كتابته حرفًا بحرف قبل فتح زرّ التأكيد — للأخطر وحده. */
   confirmPhrase?: string;
   confirmLabel?: string;
+  /** سببُ منعٍ معروف مسبقًا — يُعرَض بلا زرّ تنفيذ. */
+  blockedReason?: string;
   onConfirm: () => void | Promise<unknown>;
 }
 
@@ -76,6 +78,9 @@ export function useConfirm(): UseConfirmResult {
           {...(request.confirmLabel === undefined
             ? {}
             : { confirmLabel: request.confirmLabel })}
+          {...(request.blockedReason === undefined
+            ? {}
+            : { blockedReason: request.blockedReason })}
           isLoading={isRunning}
           error={error}
           onConfirm={() => void run()}

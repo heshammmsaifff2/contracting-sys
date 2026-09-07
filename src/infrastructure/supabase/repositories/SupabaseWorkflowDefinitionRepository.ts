@@ -48,7 +48,8 @@ const SELECT_WITH_STAGES = `
       id, stage_id, kind, condition, min_attachments, message, applies_to, sort_order
     ),
     workflow_stage_participants(
-      id, stage_id, kind, user_id, role_id, department_id, is_optional, sort_order,
+      id, stage_id, kind, user_id, role_id, department_id, is_optional,
+      requires_sign, sort_order,
       profiles(full_name), roles(name), departments(name)
     ),
     workflow_actions(
@@ -70,6 +71,7 @@ interface ParticipantRow {
   role_id: string | null;
   department_id: string | null;
   is_optional: boolean;
+  requires_sign: boolean;
   sort_order: number;
   profiles: { full_name: string } | null;
   roles: { name: string } | null;
@@ -154,6 +156,7 @@ const POLICIES: readonly CompletionPolicy[] = ["all", "any", "quorum"];
 const KINDS: readonly ParticipantKind[] = [
   "user",
   "role",
+  "project_role",
   "department_role",
   "requester",
 ];
@@ -286,6 +289,7 @@ function toDto(row: DefinitionRow): WorkflowDefinitionDto {
             departmentId: p.department_id,
             departmentName: p.departments?.name ?? null,
             isOptional: p.is_optional,
+            requiresSign: p.requires_sign,
             sortOrder: p.sort_order,
           })),
       })),
@@ -434,11 +438,14 @@ export class SupabaseWorkflowDefinitionRepository implements IWorkflowDefinition
         kind: input.kind,
         user_id: input.kind === "user" ? input.userId : null,
         role_id:
-          input.kind === "role" || input.kind === "department_role"
+          input.kind === "role" ||
+          input.kind === "project_role" ||
+          input.kind === "department_role"
             ? input.roleId
             : null,
         department_id: input.kind === "department_role" ? input.departmentId : null,
         is_optional: input.isOptional,
+        requires_sign: input.kind === "project_role" ? input.requiresSign : false,
         sort_order: input.sortOrder,
       };
 

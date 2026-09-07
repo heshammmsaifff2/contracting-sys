@@ -489,15 +489,19 @@ export function WorkflowAdminPage() {
                         const isBlocked = definition.transactionCount > 0;
                         confirm.ask({
                           title: t.workflowAdmin.deleteDefinition,
-                          description: isBlocked
-                            ? t.workflowAdmin.deleteBlocked(definition.transactionCount)
-                            : t.workflowAdmin.deleteDefinitionHint(
-                                definition.name,
-                                definition.version,
-                              ),
                           ...(isBlocked
-                            ? {}
+                            ? {
+                                blockedReason: t.workflowAdmin.deleteBlocked(
+                                  definition.transactionCount,
+                                  definition.name,
+                                  definition.version,
+                                ),
+                              }
                             : {
+                                description: t.workflowAdmin.deleteDefinitionHint(
+                                  definition.name,
+                                  definition.version,
+                                ),
                                 consequences: [
                                   t.workflowAdmin.deleteStagesCount(
                                     definition.stages.length,

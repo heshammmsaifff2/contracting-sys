@@ -9,7 +9,7 @@
  * أخطر يطلب كتابة الاسم بيد المستخدم قبل أن ينفتح.
  */
 import { useState, type ReactNode } from "react";
-import { AlertTriangle, Trash2 } from "lucide-react";
+import { AlertTriangle, Ban, Trash2 } from "lucide-react";
 import { Modal } from "./Modal";
 import { Button } from "./Button";
 import { Input } from "./Input";
@@ -32,6 +32,13 @@ export interface ConfirmDialogProps {
   isLoading?: boolean;
   /** رسالة الخطأ إن رفض الخادم — تبقى النافذة مفتوحة ليقرأها. */
   error?: string | null;
+  /**
+   * سببُ منعٍ معروف **قبل** المحاولة.
+   *
+   * حين يُمرَّر لا يُعرَض زرّ التنفيذ أصلًا: زرٌّ يُفتح لفعلٍ نعلم أنه سيُردّ
+   * يُعلّم المستخدم أن يضغط ثم يقرأ، والصواب أن يقرأ فلا يضغط.
+   */
+  blockedReason?: string;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -44,11 +51,13 @@ export function ConfirmDialog({
   confirmLabel = t.common.delete,
   isLoading = false,
   error = null,
+  blockedReason,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
   const [typed, setTyped] = useState("");
 
+  const isBlocked = blockedReason !== undefined;
   const isUnlocked =
     confirmPhrase === undefined || typed.trim() === confirmPhrase.trim();
 
@@ -58,31 +67,46 @@ export function ConfirmDialog({
       onClose={onCancel}
       title={title}
       footer={
-        <>
-          <Button
-            variant="danger"
-            onClick={onConfirm}
-            isLoading={isLoading}
-            disabled={!isUnlocked}
-            startIcon={<Trash2 aria-hidden className="size-4" />}
-          >
-            {confirmLabel}
-          </Button>
-          <Button variant="ghost" onClick={onCancel}>
-            {t.common.cancel}
-          </Button>
-        </>
+        isBlocked ? (
+          <Button onClick={onCancel}>{t.common.close}</Button>
+        ) : (
+          <>
+            <Button
+              variant="danger"
+              onClick={onConfirm}
+              isLoading={isLoading}
+              disabled={!isUnlocked}
+              startIcon={<Trash2 aria-hidden className="size-4" />}
+            >
+              {confirmLabel}
+            </Button>
+            <Button variant="ghost" onClick={onCancel}>
+              {t.common.cancel}
+            </Button>
+          </>
+        )
       }
     >
       <div className="flex flex-col gap-4">
         <div className="flex items-start gap-3">
-          <AlertTriangle aria-hidden className="text-danger mt-0.5 size-5 shrink-0" />
-          <p className="text-content text-sm">
-            {description ?? t.common.confirmDelete}
-          </p>
+          {isBlocked ? (
+            <Ban aria-hidden className="text-danger mt-0.5 size-5 shrink-0" />
+          ) : (
+            <AlertTriangle aria-hidden className="text-danger mt-0.5 size-5 shrink-0" />
+          )}
+          <div className="min-w-0">
+            {isBlocked && (
+              <p className="text-content mb-1 text-sm font-bold">
+                {t.common.cannotDelete}
+              </p>
+            )}
+            <p className="text-content text-sm whitespace-pre-line">
+              {blockedReason ?? description ?? t.common.confirmDelete}
+            </p>
+          </div>
         </div>
 
-        {consequences !== undefined && consequences.length > 0 && (
+        {!isBlocked && consequences !== undefined && consequences.length > 0 && (
           <div className="border-danger/30 bg-danger-soft rounded-[var(--radius-control)] border p-3">
             <p className="text-content mb-1 text-xs font-bold">
               {t.common.irreversible}
@@ -95,7 +119,7 @@ export function ConfirmDialog({
           </div>
         )}
 
-        {confirmPhrase !== undefined && (
+        {!isBlocked && confirmPhrase !== undefined && (
           <FormField label={t.common.typeToConfirm} hint={confirmPhrase} required>
             {(id) => (
               <Input

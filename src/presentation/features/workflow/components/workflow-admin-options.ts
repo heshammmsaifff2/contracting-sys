@@ -28,6 +28,7 @@ export const POLICY_OPTIONS = [
 // `department_role` مدعوم في المحرّك، ويظهر هنا حين تُضاف شاشة الأقسام
 export const KIND_OPTIONS = [
   { value: "user", label: t.workflowAdmin.kindUser },
+  { value: "project_role", label: t.workflowAdmin.kindProjectRole },
   { value: "role", label: t.workflowAdmin.kindRole },
   { value: "requester", label: t.workflowAdmin.kindRequester },
 ];
@@ -86,6 +87,11 @@ export function participantLabel(participant: StageParticipantDto): string {
       return participant.userName ?? "—";
     case "role":
       return `${t.workflowAdmin.role}: ${participant.roleName ?? "—"}`;
+    case "project_role":
+      return (
+        `${participant.roleName ?? "—"} · ${t.workflowAdmin.ofProject}` +
+        (participant.requiresSign ? ` · ${t.workflowAdmin.signersOnly}` : "")
+      );
     case "department_role":
       return `${participant.roleName ?? "—"} · ${participant.departmentName ?? "—"}`;
     case "requester":

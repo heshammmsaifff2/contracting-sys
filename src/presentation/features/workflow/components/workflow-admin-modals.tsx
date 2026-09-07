@@ -448,7 +448,11 @@ export function ParticipantModal({
   const [userId, setUserId] = useState("");
   const [roleId, setRoleId] = useState("");
   const [isOptional, setIsOptional] = useState(false);
+  const [requiresSign, setRequiresSign] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // `project_role` و`role` كلاهما يحمل دورًا؛ والفرق نطاق الحلّ لا شكل النموذج
+  const needsRole = kind === "role" || kind === "project_role";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -459,9 +463,10 @@ export function ParticipantModal({
         stageId: stage.id,
         kind,
         userId: kind === "user" && userId !== "" ? userId : null,
-        roleId: kind === "role" && roleId !== "" ? roleId : null,
+        roleId: needsRole && roleId !== "" ? roleId : null,
         departmentId: null,
         isOptional,
+        requiresSign: kind === "project_role" && requiresSign,
         sortOrder: stage.participants.length + 1,
       });
       onClose();
@@ -523,7 +528,13 @@ export function ParticipantModal({
           </FormField>
         )}
 
-        {kind === "role" && (
+        {kind === "project_role" && (
+          <p className="text-content-muted bg-surface-sunken rounded-md p-3 text-sm">
+            {t.workflowAdmin.kindProjectRoleHint}
+          </p>
+        )}
+
+        {needsRole && (
           <FormField label={t.workflowAdmin.role} required>
             {(id) => (
               <Select
@@ -538,6 +549,15 @@ export function ParticipantModal({
               />
             )}
           </FormField>
+        )}
+
+        {kind === "project_role" && (
+          <Checkbox
+            label={t.workflowAdmin.requiresSign}
+            hint={t.workflowAdmin.requiresSignHint}
+            checked={requiresSign}
+            onChange={(e) => setRequiresSign(e.target.checked)}
+          />
         )}
 
         <Checkbox

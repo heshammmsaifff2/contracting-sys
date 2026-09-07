@@ -13,6 +13,7 @@ export const ar = {
     cancel: "إلغاء",
     delete: "حذف",
     confirmDelete: "هل تريد المتابعة؟ لا يمكن التراجع عن هذا الفعل.",
+    cannotDelete: "لا يمكن الحذف",
     irreversible: "سيذهب معه:",
     typeToConfirm: "اكتب الاسم للتأكيد",
     edit: "تعديل",
@@ -685,7 +686,15 @@ export const ar = {
     addParticipant: "إضافة مشارك",
     participantKind: "نوع المشارك",
     kindUser: "موظف بعينه",
-    kindRole: "دور — كل حامليه",
+    kindRole: "دور — كل حامليه في الشركة",
+    kindProjectRole: "دور داخل مشروع المعاملة",
+    kindProjectRoleHint:
+      "يُكلَّف حاملو الدور المسنَدون على مشروع هذه المعاملة وحدهم — فلا يرى مديرُ مشروعٍ معاملةَ مشروعٍ آخر. ومعاملةٌ بلا مشروع تقف المرحلة عندها بانتظار مدير النظام.",
+    ofProject: "مشروع المعاملة",
+    signersOnly: "الموقّعون",
+    requiresSign: "الموقّعون على المشروع فقط",
+    requiresSignHint:
+      "يقصر التكليف على من له حقّ التوقيع على مستندات المشروع — فالمسنَد للاطّلاع يقرأ ولا يعتمد.",
     kindDepartmentRole: "دور داخل قسم",
     kindRequester: "طالب المعاملة",
     isOptional: "اختياري",
@@ -769,9 +778,13 @@ export const ar = {
     deleteDefinition: "حذف المسار",
     deleteDefinitionHint: (name: string, version: number) =>
       `سيُحذف «${name}» الإصدار ${version} نهائيًّا.`,
-    deleteBlocked: (count: number) =>
-      `لا يُحذف: ${count} معاملة تسير على هذا الإصدار أو سارت عليه. ` +
-      `عطّله بدل حذفه ليبقى تاريخها مقروءًا.`,
+    deleteBlocked: (count: number, name: string, version: number) =>
+      `على «${name}» الإصدار ${version} ${count === 1 ? "معاملة واحدة" : `${count} معاملة`} ` +
+      `— جارية أو انتهت. وتاريخُها يشير إليه، فحذفه يترك سجلًّا يشير إلى عدم.
+
+` +
+      `احذف تلك المعاملات أولًا إن كنت تريد الحذف، أو عطّل الإصدار من زرّ ` +
+      `التعديل: يتوقّف عن استقبال معاملات جديدة ويبقى تاريخها مقروءًا.`,
     deleteStagesCount: (count: number) => `${count} مرحلة بمشاركيها وشروطها`,
     deleteRest: "كل الأزرار ووجهاتها الشرطية",
     deleteStage: "حذف المرحلة",

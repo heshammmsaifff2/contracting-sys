@@ -39,8 +39,12 @@ export class ValidationError extends DomainError {
 }
 
 export class NotFoundError extends DomainError {
-  constructor(entity: string, id: string) {
-    super("NOT_FOUND", `${entity} غير موجود: ${id}`, { entity, id });
+  /**
+   * `message` يُمرَّر حين تكتب القاعدة سببًا أدقّ من «غير موجود»:
+   * «إجراء غير معروف لهذه المرحلة: nope» أنفع من «الإجراء غير موجود: ».
+   */
+  constructor(entity: string, id: string, message?: string) {
+    super("NOT_FOUND", message ?? `${entity} غير موجود: ${id}`, { entity, id });
     this.name = "NotFoundError";
   }
 }

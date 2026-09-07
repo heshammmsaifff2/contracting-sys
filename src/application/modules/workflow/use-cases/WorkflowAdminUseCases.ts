@@ -245,6 +245,7 @@ export class SaveStageParticipant implements UseCase<SaveStageParticipantDto, vo
         case "user":
           return input.userId === null ? "اختر الموظف" : null;
         case "role":
+        case "project_role":
           return input.roleId === null ? "اختر الدور" : null;
         case "department_role":
           return input.roleId === null || input.departmentId === null

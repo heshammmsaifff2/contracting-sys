@@ -223,12 +223,14 @@ export type JoinPolicy = "none" | "wait_all";
 /** أي إجراء يقرّر الوجهة حين يختلف المشاركون تحت سياسة «الكل». */
 export type ConflictPolicy = "backward_wins" | "first_wins" | "last_wins";
 
-export type ParticipantKind = "user" | "role" | "department_role" | "requester";
+export type ParticipantKind =
+  "user" | "role" | "project_role" | "department_role" | "requester";
 
 /**
  * مشارك في تعريف المرحلة.
  * `role` يتمدّد وقت التشغيل إلى **كل** حاملي الدور النشطين — وهو ما يجعل
- * المرحلة تقف عند أكثر من موظف.
+ * المرحلة تقف عند أكثر من موظف. و`project_role` يقصرهم على مسنَدي مشروع
+ * المعاملة، فلا يرى مديرُ مشروعٍ مستخلصَ مشروعٍ آخر.
  */
 export interface StageParticipantDto {
   id: string;
@@ -241,6 +243,8 @@ export interface StageParticipantDto {
   departmentId: string | null;
   departmentName: string | null;
   isOptional: boolean;
+  /** لـ `project_role` وحده: من له حقّ التوقيع على مستندات المشروع فقط. */
+  requiresSign: boolean;
   sortOrder: number;
 }
 
@@ -252,6 +256,7 @@ export interface SaveStageParticipantDto {
   roleId: string | null;
   departmentId: string | null;
   isOptional: boolean;
+  requiresSign: boolean;
   sortOrder: number;
 }
 

@@ -5588,6 +5588,7 @@ export type Database = {
           id: string
           is_optional: boolean
           kind: string
+          requires_sign: boolean
           role_id: string | null
           sort_order: number
           stage_id: string
@@ -5599,6 +5600,7 @@ export type Database = {
           id?: string
           is_optional?: boolean
           kind: string
+          requires_sign?: boolean
           role_id?: string | null
           sort_order?: number
           stage_id: string
@@ -5610,6 +5612,7 @@ export type Database = {
           id?: string
           is_optional?: boolean
           kind?: string
+          requires_sign?: boolean
           role_id?: string | null
           sort_order?: number
           stage_id?: string

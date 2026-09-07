@@ -266,6 +266,23 @@ describe("WorkflowGraph — الفحص", () => {
     expect(codes).not.toContain("quorum_exceeds_participants");
   });
 
+  /**
+   * `project_role` يتمدّد كذلك — إلى مسنَدي مشروع المعاملة. وعددهم لا يُعرف
+   * قبل التشغيل، فاتّهامه بتجاوز النصاب حكمٌ على غيب.
+   */
+  it("ولا حين يتمدّد الدور داخل المشروع", () => {
+    const codes = validateWorkflowGraph([
+      stage({
+        id: "a",
+        isStart: true,
+        isFinal: true,
+        quorumCount: 5,
+        participants: [{ kind: "project_role" }],
+      }),
+    ]).map((i) => i.code);
+    expect(codes).not.toContain("quorum_exceeds_participants");
+  });
+
   it("دورة الإرجاع مقصودة فلا تُعدّ حلقة", () => {
     const codes = validateWorkflowGraph(healthyStages()).map((i) => i.code);
     expect(codes).not.toContain("cycle");
