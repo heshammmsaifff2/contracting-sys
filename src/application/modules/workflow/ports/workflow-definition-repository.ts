@@ -3,6 +3,7 @@ import type { Result } from "@core/shared/result";
 import type {
   DurationChangeDto,
   SaveActionRouteDto,
+  SavePipelineWorkflowDto,
   SaveStageParticipantDto,
   SaveStagePositionsDto,
   SaveStageRequirementDto,
@@ -16,6 +17,10 @@ export interface IWorkflowDefinitionRepository {
   list(): Promise<Result<readonly WorkflowDefinitionDto[], DomainError>>;
   saveDefinition(
     input: SaveWorkflowDefinitionDto,
+  ): Promise<Result<WorkflowDefinitionDto, DomainError>>;
+  /** إنشاء وحفظ مسار كامل مع مراحله ومشاركيه وتوجيهاته آليًا. */
+  savePipeline(
+    input: SavePipelineWorkflowDto,
   ): Promise<Result<WorkflowDefinitionDto, DomainError>>;
   /** حذف تعريف بإصداره وكل ما تحته — يُرفض إن سارت عليه معاملة. */
   removeDefinition(id: string): Promise<Result<void, DomainError>>;

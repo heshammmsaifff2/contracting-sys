@@ -11,13 +11,15 @@ export interface ModalProps {
   children: ReactNode;
   /** أزرار الإجراءات أسفل النافذة. */
   footer?: ReactNode;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl" | "full";
 }
 
 const SIZES = {
   sm: "max-w-md",
   md: "max-w-2xl",
   lg: "max-w-4xl",
+  xl: "max-w-6xl",
+  full: "max-w-[96vw]",
 } as const;
 
 /** نافذة حوارية أصلية (<dialog>) — تدعم Esc وحبس التركيز تلقائيًا. */

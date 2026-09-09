@@ -134,6 +134,7 @@ import {
 import {
   ListWorkflowDefinitions,
   SaveWorkflowDefinition,
+  SavePipelineWorkflow,
   RemoveWorkflowDefinition,
   SaveWorkflowStage,
   SaveStagePositions,
@@ -470,6 +471,7 @@ export interface Container {
     readonly listDurationChanges: ListDurationChanges;
     readonly listWorkflowDefinitions: ListWorkflowDefinitions;
     readonly saveWorkflowDefinition: SaveWorkflowDefinition;
+    readonly savePipelineWorkflow: SavePipelineWorkflow;
     readonly listTransferTargets: ListTransferTargets;
     readonly transferAssignment: TransferAssignment;
     readonly sendAssignmentAlert: SendAssignmentAlert;
@@ -830,6 +832,7 @@ export function createContainer(overrides: ContainerOverrides = {}): Container {
         workflowDefinitionRepository,
       ),
       saveWorkflowDefinition: new SaveWorkflowDefinition(workflowDefinitionRepository),
+      savePipelineWorkflow: new SavePipelineWorkflow(workflowDefinitionRepository),
       listTransferTargets: new ListTransferTargets(operationsRepository),
       transferAssignment: new TransferAssignment(operationsRepository),
       sendAssignmentAlert: new SendAssignmentAlert(operationsRepository),

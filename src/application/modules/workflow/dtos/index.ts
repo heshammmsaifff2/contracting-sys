@@ -435,6 +435,60 @@ export interface SaveWorkflowDefinitionDto {
   isActive: boolean;
 }
 
+export interface PipelineStageRequirementInput {
+  readonly kind: RequirementKind;
+  readonly minAttachments?: number | null;
+  readonly message?: string;
+  readonly appliesTo?: RequirementScope;
+}
+
+export interface PipelineStageParticipantInput {
+  readonly kind: ParticipantKind;
+  readonly roleId?: string | null;
+  readonly userId?: string | null;
+  readonly departmentId?: string | null;
+  readonly requiresSign?: boolean;
+  readonly isObserver?: boolean;
+  readonly isOptional?: boolean;
+}
+
+export interface PipelineStageInput {
+  readonly name: string;
+  readonly stageKey?: string;
+  readonly slaMinutes?: number | null;
+  readonly isArchive?: boolean;
+  readonly isProgramManager?: boolean;
+  readonly requiresReceive?: boolean;
+  readonly completionPolicy?: CompletionPolicy;
+  readonly quorumCount?: number | null;
+  readonly joinPolicy?: JoinPolicy;
+  readonly conflictPolicy?: ConflictPolicy;
+  readonly claimPolicy?: ClaimPolicy;
+  readonly deadlineSpec?: DeadlineSpec | null;
+  readonly deadlineAction?: DeadlineAction;
+  readonly returnMinutes?: number | null;
+  readonly participants?: readonly PipelineStageParticipantInput[];
+  readonly requirements?: readonly PipelineStageRequirementInput[];
+  readonly participant?: PipelineStageParticipantInput;
+  readonly kind?: ParticipantKind;
+  readonly roleId?: string | null;
+  readonly userId?: string | null;
+  readonly departmentId?: string | null;
+  readonly requiresSign?: boolean;
+  readonly isObserver?: boolean;
+  readonly isOptional?: boolean;
+  readonly requiresAttachment?: boolean;
+}
+
+export interface SavePipelineWorkflowDto {
+  readonly name: string;
+  readonly transactionType: string;
+  readonly isActive?: boolean;
+  readonly autoPublish?: boolean;
+  readonly autoWireActions?: boolean;
+  readonly stages: readonly PipelineStageInput[];
+}
+
 // ── طابور الأرشيف ───────────────────────────────────────────────────────
 /** معاملة أُغلقت ولم يصل أصلها الورقيّ الأرشيف بعد. */
 export interface ArchiveQueueItemDto {

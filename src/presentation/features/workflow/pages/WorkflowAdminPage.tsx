@@ -20,6 +20,7 @@ import {
   Map as MapIcon,
   Pencil,
   Plus,
+  Sparkles,
   Trash2,
   Upload,
   Users,
@@ -72,10 +73,12 @@ import {
   participantLabel,
 } from "../components/workflow-admin-options";
 import { WorkflowMapEditor } from "../components/WorkflowMapEditor";
+import { WorkflowPipelineBuilder } from "../components/WorkflowPipelineBuilder";
+import { WorkflowPipelineView } from "../components/WorkflowPipelineView";
 import { t } from "@i18n/index";
 
 /** العرض يُختار لكل مسار على حدة — المحرِّر يقفز بين الشكل والتفاصيل. */
-type DefinitionView = "list" | "map";
+type DefinitionView = "list" | "map" | "pipeline";
 
 const STATUS_TONES: Record<DefinitionStatus, "success" | "warning" | "neutral"> = {
   published: "success",
@@ -282,6 +285,7 @@ export function WorkflowAdminPage() {
    * والمطويّ يبقى مقروءًا: اسمه ونوعه وحالته وعدد مراحله وهل فيه إشكال.
    */
   const [expanded, setExpanded] = useState<Readonly<Record<string, boolean>>>({});
+  const [isPipelineOpen, setIsPipelineOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -316,13 +320,21 @@ export function WorkflowAdminPage() {
 
           <PermissionGate permission="workflow.manage">
             <Button
+              variant="secondary"
               onClick={() => {
                 setEditingDefinition(null);
                 setIsDefinitionOpen(true);
               }}
               startIcon={<GitBranch aria-hidden className="size-4" />}
             >
-              {t.workflowAdmin.add}
+              {t.workflowAdmin.customModalAdd}
+            </Button>
+
+            <Button
+              onClick={() => setIsPipelineOpen(true)}
+              startIcon={<Sparkles aria-hidden className="size-4" />}
+            >
+              {t.workflowAdmin.pipelineBuilder}
             </Button>
           </PermissionGate>
         </span>
@@ -422,6 +434,20 @@ export function WorkflowAdminPage() {
                     startIcon={<List aria-hidden className="size-4" />}
                   >
                     {t.workflowMap.viewList}
+                  </Button>
+                  <Button
+                    variant={
+                      (views[definition.id] ?? "list") === "pipeline"
+                        ? "secondary"
+                        : "ghost"
+                    }
+                    size="sm"
+                    onClick={() =>
+                      setViews((current) => ({ ...current, [definition.id]: "pipeline" }))
+                    }
+                    startIcon={<Sparkles aria-hidden className="size-4" />}
+                  >
+                    {t.workflowMap.viewPipeline}
                   </Button>
                   <Button
                     variant={
@@ -541,6 +567,8 @@ export function WorkflowAdminPage() {
 
                 {(views[definition.id] ?? "list") === "map" ? (
                   <WorkflowMapEditor definition={definition} />
+                ) : (views[definition.id] ?? "list") === "pipeline" ? (
+                  <WorkflowPipelineView definition={definition} />
                 ) : definition.stages.length === 0 ? (
                   <EmptyState title={t.workflowAdmin.noStages} />
                 ) : (
@@ -868,6 +896,17 @@ export function WorkflowAdminPage() {
           key={editingDefinition?.id ?? "new"}
           definition={editingDefinition}
           onClose={() => setIsDefinitionOpen(false)}
+        />
+      )}
+
+      {isPipelineOpen && (
+        <WorkflowPipelineBuilder
+          isOpen={isPipelineOpen}
+          onClose={() => setIsPipelineOpen(false)}
+          onSuccess={(created) => {
+            setMessage(t.workflowAdmin.pipelineSavedSuccess);
+            setExpanded((prev) => ({ ...prev, [created.id]: true }));
+          }}
         />
       )}
 

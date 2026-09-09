@@ -20,6 +20,7 @@ import type {
   SaveActionRouteDto,
   SaveEvaluationScoreDto,
   SaveHolidayDto,
+  SavePipelineWorkflowDto,
   SaveStageParticipantDto,
   SaveStagePositionsDto,
   SaveStageRequirementDto,
@@ -78,6 +79,54 @@ export class SaveWorkflowDefinition implements UseCase<
       return err(new ValidationError("اسم المسار مطلوب", { name: "required" }));
     }
     return this.repo.saveDefinition(input);
+  }
+}
+
+/**
+ * إنشاء مسار كامل عبر منشئ خطوط الأنابيب (Pipeline Builder).
+ */
+export class SavePipelineWorkflow implements UseCase<
+  SavePipelineWorkflowDto,
+  WorkflowDefinitionDto
+> {
+  private readonly repo: IWorkflowDefinitionRepository;
+
+  constructor(repo: IWorkflowDefinitionRepository) {
+    this.repo = repo;
+  }
+
+  async execute(
+    input: SavePipelineWorkflowDto,
+  ): Promise<Result<WorkflowDefinitionDto, DomainError>> {
+    if (!/^[a-z][a-z0-9_]{1,31}$/.test(input.transactionType)) {
+      return err(
+        new ValidationError(
+          "نوع المعاملة يقبل الحروف الإنجليزية الصغيرة والأرقام و _ فقط",
+          { transactionType: "pattern" },
+        ),
+      );
+    }
+    if (input.name.trim().length < 2) {
+      return err(new ValidationError("اسم المسار مطلوب", { name: "required" }));
+    }
+    if (!input.stages || input.stages.length === 0) {
+      return err(
+        new ValidationError("المسار يجب أن يحتوي على مرحلة واحدة على الأقل", {
+          stages: "empty",
+        }),
+      );
+    }
+    for (let i = 0; i < input.stages.length; i++) {
+      const stage = input.stages[i];
+      if (!stage || !stage.name || stage.name.trim().length === 0) {
+        return err(
+          new ValidationError(`اسم المرحلة رقم ${i + 1} مطلوب`, {
+            [`stages.${i}.name`]: "required",
+          }),
+        );
+      }
+    }
+    return this.repo.savePipeline(input);
   }
 }
 

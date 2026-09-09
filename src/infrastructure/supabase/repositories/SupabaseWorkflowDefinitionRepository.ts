@@ -1,5 +1,5 @@
 import type { DomainError } from "@core/shared/errors/domain-error";
-import { toDomainError } from "@core/shared/errors/domain-error";
+import { toDomainError, ValidationError } from "@core/shared/errors/domain-error";
 import { err, ok, okVoid, type Result } from "@core/shared/result";
 import type { CompletionPolicy } from "@core/modules/workflow/entities/StageInstance";
 import type { ActionKind } from "@core/modules/workflow/entities/WorkflowAction";
@@ -18,6 +18,7 @@ import type {
   JoinPolicy,
   ParticipantKind,
   SaveActionRouteDto,
+  SavePipelineWorkflowDto,
   SaveStageParticipantDto,
   SaveStagePositionsDto,
   SaveStageRequirementDto,
@@ -433,6 +434,305 @@ export class SupabaseWorkflowDefinitionRepository implements IWorkflowDefinition
       return okVoid();
     } catch (e) {
       return err(toDomainError(e, "تعذّر حفظ مواضع المراحل"));
+    }
+  }
+
+  /**
+   * إنشاء مسار كامل عبر منشئ خطوط الأنابيب (Pipeline Builder).
+   * يُنشئ المسار والمراحل والمشاركين والأزرار والتوجيهات تلقائيًا وبشكل متسلسل.
+   */
+  async savePipeline(
+    input: SavePipelineWorkflowDto,
+  ): Promise<Result<WorkflowDefinitionDto, DomainError>> {
+    if (!input.name || input.name.trim().length === 0) {
+      return err(new ValidationError("اسم المسار مطلوب"));
+    }
+    if (!input.transactionType || input.transactionType.trim().length === 0) {
+      return err(new ValidationError("نوع المعاملة مطلوب"));
+    }
+    if (!input.stages || input.stages.length === 0) {
+      return err(new ValidationError("المسار يجب أن يحتوي على مرحلة واحدة على الأقل"));
+    }
+
+    try {
+      // 1. إنشاء تعريف المسار
+      const { data: defData, error: defError } = await this.client
+        .from("workflow_definitions")
+        .insert({
+          transaction_type: input.transactionType.trim(),
+          name: input.name.trim(),
+          is_active: input.isActive ?? true,
+        })
+        .select("id")
+        .single();
+
+      if (defError) return err(toDomainDbError(defError, { entity: "مسار سير العمل" }));
+      const definitionId = defData.id;
+
+      // 2. إنشاء المراحل بالترتيب
+      const stageIds: string[] = [];
+      const stageCount = input.stages.length;
+
+      for (let i = 0; i < stageCount; i++) {
+        const s = input.stages[i];
+        if (!s) continue;
+        const isStart = i === 0;
+        const isFinal = i === stageCount - 1;
+        const stageName = s.name.trim() || `المرحلة ${i + 1}`;
+        const stageKey = s.stageKey?.trim() || `stage_${i + 1}`;
+
+        const { data: stageData, error: stageError } = await this.client
+          .from("workflow_stages")
+          .insert({
+            definition_id: definitionId,
+            stage_key: stageKey,
+            name: stageName,
+            sort_order: (i + 1) * 10,
+            completion_policy: s.completionPolicy ?? "all",
+            quorum_count: s.quorumCount ?? null,
+            is_start: isStart,
+            is_final: isFinal,
+            is_archive: isFinal ? (s.isArchive ?? true) : false,
+            is_program_manager: s.isProgramManager ?? false,
+            requires_receive: s.requiresReceive ?? false,
+            sla_minutes: s.slaMinutes ?? null,
+            join_policy: s.joinPolicy ?? "none",
+            conflict_policy: s.conflictPolicy ?? "backward_wins",
+            claim_policy: s.claimPolicy ?? "none",
+            deadline_spec: s.deadlineSpec
+              ? { time: s.deadlineSpec.time, days: [...s.deadlineSpec.days] }
+              : null,
+            deadline_action: s.deadlineAction ?? "notify",
+            pos_x: 100 + i * 280,
+            pos_y: 200,
+          })
+          .select("id")
+          .single();
+
+        if (stageError) return err(toDomainDbError(stageError, { entity: "مرحلة سير العمل" }));
+        stageIds.push(stageData.id);
+      }
+
+      // 3. ربط المرحلة التالية الافتراضية default_next_stage_id
+      for (let i = 0; i < stageIds.length - 1; i++) {
+        const currentId = stageIds[i];
+        const nextId = stageIds[i + 1];
+        if (!currentId || !nextId) continue;
+
+        const { error: linkError } = await this.client
+          .from("workflow_stages")
+          .update({ default_next_stage_id: nextId })
+          .eq("id", currentId);
+
+        if (linkError) return err(toDomainDbError(linkError, { entity: "ربط المرحلة التالية" }));
+      }
+
+      // 4. تعيين المشاركين وشروط الجاهزية
+      for (let i = 0; i < stageCount; i++) {
+        const s = input.stages[i];
+        const currentStageId = stageIds[i];
+        if (!s || !currentStageId) continue;
+
+        const participantsList =
+          s.participants && s.participants.length > 0
+            ? s.participants
+            : [
+                s.participant ?? {
+                  kind: s.kind ?? "requester",
+                  roleId: s.roleId ?? null,
+                  userId: s.userId ?? null,
+                  departmentId: s.departmentId ?? null,
+                  requiresSign: s.requiresSign ?? false,
+                  isObserver: s.isObserver ?? false,
+                  isOptional: s.isOptional ?? false,
+                },
+              ];
+
+        for (let pIdx = 0; pIdx < participantsList.length; pIdx++) {
+          const p = participantsList[pIdx];
+          if (!p) continue;
+          const kind: ParticipantKind = p.kind ?? "requester";
+          const roleId = p.roleId ?? null;
+          const userId = p.userId ?? null;
+          const deptId = p.departmentId ?? null;
+          const requiresSign = p.requiresSign ?? false;
+          const isObserver = p.isObserver ?? false;
+          const isOptional = p.isOptional ?? false;
+
+          const participantPayload = {
+            stage_id: currentStageId,
+            kind,
+            user_id: kind === "user" ? userId : null,
+            role_id:
+              kind === "role" || kind === "project_role" || kind === "department_role"
+                ? roleId
+                : null,
+            department_id: kind === "department_role" ? deptId : null,
+            is_optional: isObserver ? false : isOptional,
+            requires_sign: kind === "project_role" ? requiresSign : false,
+            is_observer: isObserver,
+            sort_order: pIdx + 1,
+          };
+
+          const { error: partError } = await this.client
+            .from("workflow_stage_participants")
+            .insert(participantPayload);
+
+          if (partError) return err(toDomainDbError(partError, { entity: "مشارك المرحلة" }));
+        }
+
+        // إدراج شروط الجاهزية (مثل اشتراط إرفاق مستندات قبل المتابعة)
+        if (s.requirements && s.requirements.length > 0) {
+          for (let rIdx = 0; rIdx < s.requirements.length; rIdx++) {
+            const req = s.requirements[rIdx];
+            if (!req) continue;
+            const { error: reqError } = await this.client
+              .from("workflow_stage_requirements")
+              .insert({
+                stage_id: currentStageId,
+                kind: req.kind,
+                min_attachments:
+                  req.kind === "attachment" ? (req.minAttachments ?? 1) : null,
+                message: req.message || "",
+                applies_to: req.appliesTo ?? "advancing",
+                sort_order: rIdx + 1,
+              });
+
+            if (reqError)
+              return err(toDomainDbError(reqError, { entity: "شرط الجاهزية" }));
+          }
+        }
+      }
+
+      // 5. ربط الإجراءات والمسارات تلقائيًا (Auto-wiring)
+      const autoWire = input.autoWireActions !== false;
+      if (autoWire) {
+        for (let i = 0; i < stageCount; i++) {
+          const s = input.stages[i];
+          const currentStageId = stageIds[i];
+          if (!currentStageId) continue;
+          const isFinal = i === stageCount - 1;
+
+          if (!isFinal) {
+            const nextStageId = stageIds[i + 1];
+            if (!nextStageId) continue;
+
+            // زر الاعتماد والتقدم (Forward)
+            const { data: forwardAction, error: fwdErr } = await this.client
+              .from("workflow_actions")
+              .insert({
+                stage_id: currentStageId,
+                action_key: "forward",
+                label: "اعتماد وإرسال",
+                kind: "forward",
+                sort_order: 1,
+                requires_note: false,
+                requires_attachment: false,
+                requires_evaluation: false,
+                return_minutes: null,
+              })
+              .select("id")
+              .single();
+
+            if (fwdErr) return err(toDomainDbError(fwdErr, { entity: "إجراء اعتماد المرحلة" }));
+
+            // مسار للأمام
+            const { error: routeErr } = await this.client
+              .from("workflow_action_routes")
+              .insert({
+                action_id: forwardAction.id,
+                priority: 1,
+                condition: null,
+                target_stage_id: nextStageId,
+              });
+
+            if (routeErr) return err(toDomainDbError(routeErr, { entity: "مسار الإجراء للأمام" }));
+          } else {
+            // زر الإغلاق والأرشفة للمرحلة النهائية
+            const { error: finalErr } = await this.client
+              .from("workflow_actions")
+              .insert({
+                stage_id: currentStageId,
+                action_key: "archive",
+                label: "إغلاق وأرشفة",
+                kind: "final",
+                sort_order: 1,
+                requires_note: false,
+                requires_attachment: false,
+                requires_evaluation: false,
+                return_minutes: null,
+              });
+
+            if (finalErr) return err(toDomainDbError(finalErr, { entity: "إجراء إغلاق المسار" }));
+          }
+
+          // زر الإرجاع / الرفض للمراحل اللاحقة للأولى
+          if (i > 0) {
+            const prevStageId = stageIds[i - 1];
+            if (prevStageId) {
+              const { data: backwardAction, error: bwdErr } = await this.client
+                .from("workflow_actions")
+                .insert({
+                  stage_id: currentStageId,
+                  action_key: "backward",
+                  label: isFinal ? "إرجاع للمراجعة" : "إرجاع / رفض",
+                  kind: "backward",
+                  sort_order: 2,
+                  requires_note: true,
+                  requires_attachment: false,
+                  requires_evaluation: false,
+                  return_minutes: s?.returnMinutes ?? null,
+                })
+                .select("id")
+                .single();
+
+              if (bwdErr) return err(toDomainDbError(bwdErr, { entity: "إجراء إرجاع المرحلة" }));
+
+              // مسار للخلف
+              const { error: bwdRouteErr } = await this.client
+                .from("workflow_action_routes")
+                .insert({
+                  action_id: backwardAction.id,
+                  priority: 1,
+                  condition: null,
+                  target_stage_id: prevStageId,
+                });
+
+              if (bwdRouteErr) return err(toDomainDbError(bwdRouteErr, { entity: "مسار الإجراء للخلف" }));
+            }
+          }
+
+          // زر الملاحظة
+          const { error: noteErr } = await this.client
+            .from("workflow_actions")
+            .insert({
+              stage_id: currentStageId,
+              action_key: "note",
+              label: "إضافة ملاحظة",
+              kind: "note",
+              sort_order: 3,
+              requires_note: true,
+              requires_attachment: false,
+              requires_evaluation: false,
+              return_minutes: null,
+            });
+
+          if (noteErr) return err(toDomainDbError(noteErr, { entity: "إجراء ملاحظة المرحلة" }));
+        }
+      }
+
+      // 6. استرجاع المسار الكامل مع جميع الكيانات التابعة
+      const { data: fullDef, error: fetchErr } = await this.client
+        .from("workflow_definitions")
+        .select(SELECT_WITH_STAGES)
+        .eq("id", definitionId)
+        .single()
+        .overrideTypes<DefinitionRow>();
+
+      if (fetchErr) return err(toDomainDbError(fetchErr, { entity: "مسار سير العمل" }));
+      return ok(toDto(fullDef));
+    } catch (e) {
+      return err(toDomainError(e, "تعذّر حفظ مسار خط الأنابيب"));
     }
   }
 

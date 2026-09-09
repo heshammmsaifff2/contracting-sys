@@ -13,6 +13,7 @@ import type {
   SaveWorkflowActionDto,
   SaveEvaluationScoreDto,
   SaveHolidayDto,
+  SavePipelineWorkflowDto,
   SaveStagePositionsDto,
   SaveStageRequirementDto,
   SaveWorkflowDefinitionDto,
@@ -213,6 +214,18 @@ export function useSaveWorkflowDefinition() {
   return useMutation({
     mutationFn: async (input: SaveWorkflowDefinitionDto) =>
       unwrap(await saveWorkflowDefinition.execute(input)),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: WORKFLOW_DEFINITIONS_KEY }),
+  });
+}
+
+export function useSavePipelineWorkflow() {
+  const { savePipelineWorkflow } = useUseCases();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: SavePipelineWorkflowDto) =>
+      unwrap(await savePipelineWorkflow.execute(input)),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: WORKFLOW_DEFINITIONS_KEY }),
   });

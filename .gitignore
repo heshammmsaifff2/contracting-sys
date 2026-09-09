@@ -34,3 +34,10 @@ supabase/.branches
 
 # Test output
 coverage
+
+# Claude
+.claude
+.claude
+
+# Agents
+.agents
