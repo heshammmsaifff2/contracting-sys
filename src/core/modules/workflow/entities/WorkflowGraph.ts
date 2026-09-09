@@ -487,8 +487,22 @@ export function autoLayoutStages(
 }
 
 /** مسار لم يُرسم بعد: كل عُقَده على الأصل، فالتخطيط التلقائي أولى. */
-export function needsAutoLayout(stages: readonly GraphStage[]): boolean {
-  return (
-    stages.length > 1 && stages.every((stage) => stage.posX === 0 && stage.posY === 0)
+export function resolveStagePositions(
+  stages: readonly GraphStage[],
+): Map<string, { x: number; y: number }> {
+  const auto = new Map(
+    autoLayoutStages(stages).map((layout) => [layout.id, { x: layout.x, y: layout.y }]),
   );
+
+  const out = new Map<string, { x: number; y: number }>();
+  for (const stage of stages) {
+    const isPlaced = stage.posX !== 0 || stage.posY !== 0;
+    out.set(
+      stage.id,
+      isPlaced
+        ? { x: stage.posX, y: stage.posY }
+        : (auto.get(stage.id) ?? { x: 0, y: 0 }),
+    );
+  }
+  return out;
 }

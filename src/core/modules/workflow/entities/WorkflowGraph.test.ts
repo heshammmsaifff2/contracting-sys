@@ -3,7 +3,7 @@ import {
   autoLayoutStages,
   buildWorkflowEdges,
   hasBlockingIssue,
-  needsAutoLayout,
+  resolveStagePositions,
   reachableStageIds,
   stageUsesDefaultNext,
   validateWorkflowGraph,
@@ -424,12 +424,28 @@ describe("WorkflowGraph — التخطيط التلقائي", () => {
     expect(Math.abs((b?.x ?? 0) - (c?.x ?? 0))).toBeGreaterThanOrEqual(208);
   });
 
-  it("اللوحة تُخطَّط تلقائيًا حين لم تُرسم بعد، لا بعد أن رُسمت", () => {
-    expect(needsAutoLayout(healthyStages())).toBe(true);
+  it("لوحةٌ لم تُرسم قطّ تُخطَّط كلّها بلا تراكب", () => {
+    const placed = resolveStagePositions(healthyStages());
+    const spots = new Set([...placed.values()].map((p) => `${p.x},${p.y}`));
+    expect(spots.size).toBe(placed.size);
+  });
+
+  it("ما رُسم يبقى في موضعه", () => {
     const drawn = healthyStages().map((s, index) =>
       index === 1 ? { ...s, posX: 40, posY: 160 } : s,
     );
-    expect(needsAutoLayout(drawn)).toBe(false);
-    expect(needsAutoLayout([stage({ id: "only" })])).toBe(false);
+    const placed = resolveStagePositions(drawn);
+    expect(placed.get(drawn[1]!.id)).toEqual({ x: 40, y: 160 });
+  });
+
+  /**
+   * مرحلةٌ تُضاف إلى مسارٍ مرتَّب تصل بموضع صفر. وكان التخطيط كلَّ شيء أو
+   * لا شيء، فتسقط في الركن فوق غيرها ولا تُرتَّب — والبقيّة موضوعة.
+   */
+  it("والمُضافة حديثًا تأخذ موضعًا لا ركن اللوحة", () => {
+    const drawn = healthyStages().map((s) => ({ ...s, posX: 40, posY: 160 }));
+    const withNew = [...drawn, stage({ id: "fresh" })];
+    const placed = resolveStagePositions(withNew);
+    expect(placed.get("fresh")).not.toEqual({ x: 0, y: 0 });
   });
 });

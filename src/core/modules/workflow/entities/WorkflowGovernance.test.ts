@@ -34,10 +34,11 @@ describe("WorkflowGovernance — الإصدار", () => {
     expect(isDefinitionEditable("retired")).toBe(false);
   });
 
-  it("الموضع يُحرَّك على المنشور — عرضٌ لا تعريف", () => {
+  it("الموضع يُحرَّك في كل إصدار — عرضٌ لا تعريف", () => {
     expect(canMoveNodes("draft")).toBe(true);
     expect(canMoveNodes("published")).toBe(true);
-    expect(canMoveNodes("retired")).toBe(false);
+    // والمتقاعد هو الأحوج: خريطته هي ما يُقرأ حين يُراجَع أثرٌ قديم
+    expect(canMoveNodes("retired")).toBe(true);
   });
 
   it("الحيّ هو المنشور النشط وحده", () => {

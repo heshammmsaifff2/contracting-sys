@@ -22,9 +22,16 @@ export function isDefinitionEditable(status: DefinitionStatus): boolean {
   return status === "draft";
 }
 
-/** الموضع على اللوحة عرضٌ لا تعريف — يُحرَّك في أي إصدار. */
-export function canMoveNodes(status: DefinitionStatus): boolean {
-  return status !== "retired";
+/**
+ * الموضع على اللوحة عرضٌ لا تعريف — يُحرَّك في أي إصدار، **والمتقاعد منها**.
+ *
+ * كان المتقاعد مستثنًى، وهو الأحوج: خريطته هي ما يُقرأ حين يُراجَع أثر
+ * معاملة قديمة، وقراءتها وهي كومة لا تُفيد. والقاعدة لا تمنعه أصلًا —
+ * `set_stage_positions` لا تسأل عن الحالة، و`guard_definition_frozen`
+ * يستثني `pos_x`/`pos_y` من التجميد. فكان المنع في الواجهة وحدها بلا سند.
+ */
+export function canMoveNodes(_status: DefinitionStatus): boolean {
+  return true;
 }
 
 export function isDefinitionLive(status: DefinitionStatus, isActive: boolean): boolean {

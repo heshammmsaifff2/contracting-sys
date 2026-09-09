@@ -32,7 +32,7 @@ import type {
 import {
   autoLayoutStages,
   issueSeverity,
-  needsAutoLayout,
+  resolveStagePositions,
   validateWorkflowGraph,
   type GraphIssue,
 } from "@core/modules/workflow/entities/WorkflowGraph";
@@ -452,16 +452,7 @@ export function WorkflowMapEditor({
    * ومسارٌ لم يُرسم قطّ يُخطَّط تلقائيًّا ليُرى قبل أن يُلمس.
    */
   const positions = useMemo(() => {
-    const base = new Map<string, MapPosition>();
-    if (needsAutoLayout(definition.stages)) {
-      for (const layout of autoLayoutStages(definition.stages)) {
-        base.set(layout.id, { x: layout.x, y: layout.y });
-      }
-    } else {
-      for (const stage of definition.stages) {
-        base.set(stage.id, { x: stage.posX, y: stage.posY });
-      }
-    }
+    const base = resolveStagePositions(definition.stages);
     for (const [id, position] of overrides) base.set(id, position);
     return base;
   }, [definition.stages, overrides]);

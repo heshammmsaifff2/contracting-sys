@@ -10,10 +10,7 @@
  */
 import { useMemo } from "react";
 import type { TransactionDto } from "@application/modules/workflow/dtos";
-import {
-  autoLayoutStages,
-  needsAutoLayout,
-} from "@core/modules/workflow/entities/WorkflowGraph";
+import { resolveStagePositions } from "@core/modules/workflow/entities/WorkflowGraph";
 import { Card } from "@presentation/shared/ui/Card";
 import { EmptyState } from "@presentation/shared/ui/EmptyState";
 import { useWorkflowDefinitions } from "../hooks/useWorkflow";
@@ -35,20 +32,13 @@ export function TransactionMapCard({ transaction }: { transaction: TransactionDt
     (candidate) => candidate.transactionType === transaction.type,
   );
 
-  const positions = useMemo(() => {
-    const map = new Map<string, MapPosition>();
-    if (definition === undefined) return map;
-    if (needsAutoLayout(definition.stages)) {
-      for (const layout of autoLayoutStages(definition.stages)) {
-        map.set(layout.id, { x: layout.x, y: layout.y });
-      }
-      return map;
-    }
-    for (const stage of definition.stages) {
-      map.set(stage.id, { x: stage.posX, y: stage.posY });
-    }
-    return map;
-  }, [definition]);
+  const positions = useMemo(
+    () =>
+      definition === undefined
+        ? new Map<string, MapPosition>()
+        : resolveStagePositions(definition.stages),
+    [definition],
+  );
 
   const statusByStageKey = useMemo(() => {
     const map = new Map<string, MapStageStatus>();
