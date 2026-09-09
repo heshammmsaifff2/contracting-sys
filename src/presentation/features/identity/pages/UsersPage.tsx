@@ -177,7 +177,7 @@ export function UsersPage() {
         <UserRolesModal
           isOpen
           onClose={() => setRolesTarget(null)}
-          profile={rolesTarget}
+          profileId={rolesTarget.id}
         />
       )}
     </div>

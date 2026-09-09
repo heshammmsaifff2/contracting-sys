@@ -223,6 +223,19 @@ export type JoinPolicy = "none" | "wait_all";
 /** أي إجراء يقرّر الوجهة حين يختلف المشاركون تحت سياسة «الكل». */
 export type ConflictPolicy = "backward_wins" | "first_wins" | "last_wins";
 
+/** ماذا يحدث حين تتجاوز المرحلة موعدها التقويميّ. */
+export type DeadlineAction = "notify" | "escalate";
+
+/**
+ * موعد أسبوعيّ ثابت في التقويم — غير المدّة التي تبدأ من وصول المعاملة.
+ * «مسار ١ السبت ١٢ · مسار ٢ الثلاثاء ١٢» موعدان في وصفٍ واحد:
+ * `{ time: "12:00", days: [6, 2] }`. والأيام بترقيم Postgres: ٠ الأحد.
+ */
+export interface DeadlineSpec {
+  time: string;
+  days: readonly number[];
+}
+
 export type ParticipantKind =
   "user" | "role" | "project_role" | "department_role" | "requester";
 
@@ -245,6 +258,8 @@ export interface StageParticipantDto {
   isOptional: boolean;
   /** لـ `project_role` وحده: من له حقّ التوقيع على مستندات المشروع فقط. */
   requiresSign: boolean;
+  /** يرى المعاملة كلها ولا يُكلَّف بعمل — «مدير عام» ونحوه. */
+  isObserver: boolean;
   sortOrder: number;
 }
 
@@ -257,6 +272,7 @@ export interface SaveStageParticipantDto {
   departmentId: string | null;
   isOptional: boolean;
   requiresSign: boolean;
+  isObserver: boolean;
   sortOrder: number;
 }
 
@@ -348,6 +364,9 @@ export interface WorkflowStageDto {
   conflictPolicy: ConflictPolicy;
   /** exclusive = أوّل من يحجز يقفلها على نفسه [المرحلة ٠٧]. */
   claimPolicy: ClaimPolicy;
+  /** موعد أسبوعيّ ثابت، أو null فلا موعد — المدّة وحدها تحكم. */
+  deadlineSpec: DeadlineSpec | null;
+  deadlineAction: DeadlineAction;
   /** موضع العقدة في محرّر الخريطة — عرضٌ محض، لا يمسّ التوجيه. */
   posX: number;
   posY: number;
@@ -374,6 +393,8 @@ export interface SaveWorkflowStageDto {
   joinPolicy: JoinPolicy;
   conflictPolicy: ConflictPolicy;
   claimPolicy: ClaimPolicy;
+  deadlineSpec: DeadlineSpec | null;
+  deadlineAction: DeadlineAction;
 }
 
 /**

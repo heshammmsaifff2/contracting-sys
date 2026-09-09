@@ -43,6 +43,22 @@ export const CLAIM_OPTIONS = [
   { value: "exclusive", label: t.workflowAdmin.claimExclusive },
 ];
 
+/** ترقيم Postgres لأيام الأسبوع: ٠ الأحد … ٦ السبت. */
+export const WEEKDAY_OPTIONS = [
+  { value: 6, label: t.workflowAdmin.sat },
+  { value: 0, label: t.workflowAdmin.sun },
+  { value: 1, label: t.workflowAdmin.mon },
+  { value: 2, label: t.workflowAdmin.tue },
+  { value: 3, label: t.workflowAdmin.wed },
+  { value: 4, label: t.workflowAdmin.thu },
+  { value: 5, label: t.workflowAdmin.fri },
+];
+
+export const DEADLINE_ACTION_OPTIONS = [
+  { value: "notify", label: t.workflowAdmin.deadlineNotify },
+  { value: "escalate", label: t.workflowAdmin.deadlineEscalate },
+];
+
 export const CONFLICT_OPTIONS = [
   { value: "backward_wins", label: t.workflowAdmin.conflictBackward },
   { value: "first_wins", label: t.workflowAdmin.conflictFirst },
@@ -97,4 +113,18 @@ export function participantLabel(participant: StageParticipantDto): string {
     case "requester":
       return t.workflowAdmin.kindRequester;
   }
+}
+
+/** «السبت والثلاثاء ١٢:٠٠» — يُقرأ على اللوحة بلا فتح النموذج. */
+export function deadlineLabel(stage: {
+  deadlineSpec: { time: string; days: readonly number[] } | null;
+}): string | null {
+  const spec = stage.deadlineSpec;
+  if (spec === null) return null;
+  const days = spec.days.flatMap((d) => {
+    const found = WEEKDAY_OPTIONS.find((o) => o.value === d);
+    return found === undefined ? [] : [found.label];
+  });
+  if (days.length === 0) return null;
+  return `${days.join(" · ")} ${spec.time}`;
 }

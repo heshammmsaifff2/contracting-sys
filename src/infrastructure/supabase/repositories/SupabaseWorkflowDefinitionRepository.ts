@@ -12,6 +12,8 @@ import type {
 } from "@core/modules/workflow/entities/WorkflowGovernance";
 import type {
   ConflictPolicy,
+  DeadlineAction,
+  DeadlineSpec,
   DurationChangeDto,
   JoinPolicy,
   ParticipantKind,
@@ -42,14 +44,14 @@ const SELECT_WITH_STAGES = `
     completion_policy, quorum_count,
     is_start, is_final, is_archive, is_program_manager, requires_receive,
     sla_minutes, default_next_stage_id, join_policy, conflict_policy, claim_policy,
-    pos_x, pos_y,
+    deadline_spec, deadline_action, pos_x, pos_y,
     next_stage:workflow_stages!default_next_stage_id(name),
     workflow_stage_requirements(
       id, stage_id, kind, condition, min_attachments, message, applies_to, sort_order
     ),
     workflow_stage_participants(
       id, stage_id, kind, user_id, role_id, department_id, is_optional,
-      requires_sign, sort_order,
+      requires_sign, is_observer, sort_order,
       profiles(full_name), roles(name), departments(name)
     ),
     workflow_actions(
@@ -72,6 +74,7 @@ interface ParticipantRow {
   department_id: string | null;
   is_optional: boolean;
   requires_sign: boolean;
+  is_observer: boolean;
   sort_order: number;
   profiles: { full_name: string } | null;
   roles: { name: string } | null;
@@ -130,6 +133,8 @@ interface StageRow {
   join_policy: string;
   conflict_policy: string;
   claim_policy: string;
+  deadline_spec: { time?: string; days?: number[] } | null;
+  deadline_action: string;
   pos_x: number | string;
   pos_y: number | string;
   next_stage: { name: string } | null;
@@ -153,6 +158,20 @@ interface DefinitionRow {
 }
 
 const POLICIES: readonly CompletionPolicy[] = ["all", "any", "quorum"];
+const DEADLINE_ACTIONS: readonly DeadlineAction[] = ["notify", "escalate"];
+
+/**
+ * وصف الموعد يصل من القاعدة jsonb حرًّا، فيُفحَص هنا لا في الشاشة.
+ * وصفٌ بلا وقت أو بلا أيام لا معنى له، فيُعامَل كأن لا موعد.
+ */
+function toDeadlineSpec(
+  raw: { time?: string; days?: number[] } | null,
+): DeadlineSpec | null {
+  if (raw === null || raw === undefined) return null;
+  const days = (raw.days ?? []).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6);
+  if (typeof raw.time !== "string" || raw.time === "" || days.length === 0) return null;
+  return { time: raw.time, days };
+}
 const KINDS: readonly ParticipantKind[] = [
   "user",
   "role",
@@ -229,6 +248,12 @@ function toDto(row: DefinitionRow): WorkflowDefinitionDto {
         claimPolicy: CLAIM_POLICIES.includes(stage.claim_policy as ClaimPolicy)
           ? (stage.claim_policy as ClaimPolicy)
           : "none",
+        deadlineSpec: toDeadlineSpec(stage.deadline_spec),
+        deadlineAction: DEADLINE_ACTIONS.includes(
+          stage.deadline_action as DeadlineAction,
+        )
+          ? (stage.deadline_action as DeadlineAction)
+          : "notify",
         // numeric يصل نصًّا من PostgREST؛ اللوحة تحسب بالأرقام لا بالنصوص
         posX: Number(stage.pos_x) || 0,
         posY: Number(stage.pos_y) || 0,
@@ -290,6 +315,7 @@ function toDto(row: DefinitionRow): WorkflowDefinitionDto {
             departmentName: p.departments?.name ?? null,
             isOptional: p.is_optional,
             requiresSign: p.requires_sign,
+            isObserver: p.is_observer,
             sortOrder: p.sort_order,
           })),
       })),
@@ -364,6 +390,11 @@ export class SupabaseWorkflowDefinitionRepository implements IWorkflowDefinition
         join_policy: input.joinPolicy,
         conflict_policy: input.conflictPolicy,
         claim_policy: input.claimPolicy,
+        deadline_spec:
+          input.deadlineSpec === null
+            ? null
+            : { time: input.deadlineSpec.time, days: [...input.deadlineSpec.days] },
+        deadline_action: input.deadlineAction,
       };
 
       const { error } =
@@ -444,8 +475,9 @@ export class SupabaseWorkflowDefinitionRepository implements IWorkflowDefinition
             ? input.roleId
             : null,
         department_id: input.kind === "department_role" ? input.departmentId : null,
-        is_optional: input.isOptional,
+        is_optional: input.isObserver ? false : input.isOptional,
         requires_sign: input.kind === "project_role" ? input.requiresSign : false,
+        is_observer: input.isObserver,
         sort_order: input.sortOrder,
       };
 

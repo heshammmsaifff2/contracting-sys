@@ -46,7 +46,10 @@ export interface GraphStage {
   readonly defaultNextStageId: string | null;
   readonly posX: number;
   readonly posY: number;
-  readonly participants: readonly { readonly kind: string }[];
+  readonly participants: readonly {
+    readonly kind: string;
+    readonly isObserver?: boolean;
+  }[];
   readonly actions: readonly GraphAction[];
 }
 
@@ -321,16 +324,31 @@ export function validateWorkflowGraph(
      * هذا في مسار البذرة نفسه: «اعتماد وإغلاق» فتح الأرشفة، ووقفت هناك.
      * والمرحلة التي لا تُدخَل أصلًا يرصدها `unreachable` لا هذا الفحص.
      */
-    if (stage.participants.length === 0) {
-      add("no_participants", stage, "مرحلة بلا مشاركين — المعاملة تقف بلا صاحب");
+    /**
+     * والمراقب ليس مشاركًا هنا.
+     *
+     * هو يرى ولا يُكلَّف، فلا يُنشأ له تكليف. ومرحلةٌ كلّ من فيها مراقب
+     * تقف `pending` كأنها بلا أحد — والفحص يجب أن يقولها قبل النشر لا بعد
+     * أن تقف عليها معاملة.
+     */
+    const workers = stage.participants.filter((p) => !p.isObserver);
+
+    if (workers.length === 0) {
+      add(
+        "no_participants",
+        stage,
+        stage.participants.length === 0
+          ? "مرحلة بلا مشاركين — المعاملة تقف بلا صاحب"
+          : "مرحلة بمراقبين فقط — لا أحد يُكلَّف بها فتقف المعاملة",
+      );
     }
 
     // النصاب يُحسب على المشاركين المعدودين؛ الدور يتمدّد وقت التشغيل فلا يُحسب
     if (stage.quorumCount !== null) {
-      const countable = stage.participants.filter(
+      const countable = workers.filter(
         (p) => p.kind === "user" || p.kind === "requester",
       ).length;
-      const expands = stage.participants.some(
+      const expands = workers.some(
         (p) =>
           p.kind === "role" ||
           p.kind === "project_role" ||

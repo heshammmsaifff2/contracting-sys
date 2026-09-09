@@ -65,6 +65,7 @@ import {
 } from "./workflow-admin-modals";
 import {
   ACTION_KIND_TONES,
+  deadlineLabel,
   EDGE_COLORS,
   participantLabel,
 } from "./workflow-admin-options";
@@ -168,6 +169,12 @@ function StageInspector({
         </EditGate>
       </div>
 
+      {deadlineLabel(stage) !== null && (
+        <p className="text-warning text-[11px]">
+          ◆ {t.workflowAdmin.deadlineLegend}: {deadlineLabel(stage)}
+        </p>
+      )}
+
       <div>
         <p className="text-content-muted mb-1 text-[11px] font-medium">
           {t.workflowAdmin.participants}
@@ -184,6 +191,7 @@ function StageInspector({
                 className="border-border text-content-muted flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px]"
               >
                 {participantLabel(participant)}
+                {participant.isObserver && ` · ${t.workflowAdmin.observer}`}
                 {participant.isOptional && ` · ${t.workflowAdmin.isOptional}`}
                 <EditGate isEditable={isEditable}>
                   <button

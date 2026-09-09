@@ -4963,6 +4963,9 @@ export type Database = {
           completion_policy: string
           conflict_policy: string
           created_at: string
+          deadline_action: string | null
+          deadline_at: string | null
+          deadline_notified_at: string | null
           entered_at: string
           id: string
           is_archive: boolean
@@ -4985,6 +4988,9 @@ export type Database = {
           completion_policy?: string
           conflict_policy?: string
           created_at?: string
+          deadline_action?: string | null
+          deadline_at?: string | null
+          deadline_notified_at?: string | null
           entered_at?: string
           id?: string
           is_archive?: boolean
@@ -5007,6 +5013,9 @@ export type Database = {
           completion_policy?: string
           conflict_policy?: string
           created_at?: string
+          deadline_action?: string | null
+          deadline_at?: string | null
+          deadline_notified_at?: string | null
           entered_at?: string
           id?: string
           is_archive?: boolean
@@ -5586,6 +5595,7 @@ export type Database = {
           created_at: string
           department_id: string | null
           id: string
+          is_observer: boolean
           is_optional: boolean
           kind: string
           requires_sign: boolean
@@ -5598,6 +5608,7 @@ export type Database = {
           created_at?: string
           department_id?: string | null
           id?: string
+          is_observer?: boolean
           is_optional?: boolean
           kind: string
           requires_sign?: boolean
@@ -5610,6 +5621,7 @@ export type Database = {
           created_at?: string
           department_id?: string | null
           id?: string
+          is_observer?: boolean
           is_optional?: boolean
           kind?: string
           requires_sign?: boolean
@@ -5713,6 +5725,8 @@ export type Database = {
           conflict_policy: string
           created_at: string
           created_by: string | null
+          deadline_action: string
+          deadline_spec: Json | null
           default_next_stage_id: string | null
           definition_id: string
           id: string
@@ -5737,6 +5751,8 @@ export type Database = {
           conflict_policy?: string
           created_at?: string
           created_by?: string | null
+          deadline_action?: string
+          deadline_spec?: Json | null
           default_next_stage_id?: string | null
           definition_id: string
           id?: string
@@ -5761,6 +5777,8 @@ export type Database = {
           conflict_policy?: string
           created_at?: string
           created_by?: string | null
+          deadline_action?: string
+          deadline_spec?: Json | null
           default_next_stage_id?: string | null
           definition_id?: string
           id?: string
@@ -7370,6 +7388,10 @@ export type Database = {
         Args: { p_project_id: string }
         Returns: boolean
       }
+      is_transaction_observer: {
+        Args: { p_transaction_id: string }
+        Returns: boolean
+      }
       is_transaction_participant: {
         Args: { p_transaction_id: string }
         Returns: boolean
@@ -7587,6 +7609,7 @@ export type Database = {
       }
       run_scheduled_task_now: { Args: { p_task_id: string }; Returns: string }
       run_scheduled_tasks: { Args: never; Returns: number }
+      run_stage_deadlines: { Args: never; Returns: number }
       score_after_warnings: {
         Args: { p_score: number; p_warnings: number }
         Returns: number
@@ -7741,6 +7764,10 @@ export type Database = {
         Returns: string
       }
       shift_to_workday: { Args: { p_local: string }; Returns: string }
+      stage_deadline_for: {
+        Args: { p_from?: string; p_stage_id: string }
+        Returns: string
+      }
       start_transaction: {
         Args: {
           p_context?: Json

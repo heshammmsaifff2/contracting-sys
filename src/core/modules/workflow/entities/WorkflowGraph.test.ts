@@ -267,6 +267,49 @@ describe("WorkflowGraph — الفحص", () => {
   });
 
   /**
+   * المراقب يرى ولا يُكلَّف. فمرحلةٌ ليس فيها غيره تقف بلا صاحب — ويجب أن
+   * يُقال ذلك عند الفحص، لا بعد أن تقف عليها معاملة.
+   */
+  it("يرصد مرحلةً كلّ من فيها مراقب", () => {
+    const issues = validateWorkflowGraph([
+      stage({
+        id: "a",
+        isStart: true,
+        isFinal: true,
+        participants: [{ kind: "role", isObserver: true }],
+      }),
+    ]);
+    const bad = issues.find((i) => i.code === "no_participants");
+    expect(bad?.detail).toContain("مراقبين فقط");
+  });
+
+  it("ولا يرصدها إن كان معه عاملٌ واحد", () => {
+    const codes = validateWorkflowGraph([
+      stage({
+        id: "a",
+        isStart: true,
+        isFinal: true,
+        participants: [{ kind: "role", isObserver: true }, { kind: "user" }],
+      }),
+    ]).map((i) => i.code);
+    expect(codes).not.toContain("no_participants");
+  });
+
+  /** والمراقب لا يُحتسب في النصاب كذلك — لأنه لا يتصرّف. */
+  it("لا يحتسب المراقب في النصاب", () => {
+    const codes = validateWorkflowGraph([
+      stage({
+        id: "a",
+        isStart: true,
+        isFinal: true,
+        quorumCount: 2,
+        participants: [{ kind: "user" }, { kind: "user", isObserver: true }],
+      }),
+    ]).map((i) => i.code);
+    expect(codes).toContain("quorum_exceeds_participants");
+  });
+
+  /**
    * `project_role` يتمدّد كذلك — إلى مسنَدي مشروع المعاملة. وعددهم لا يُعرف
    * قبل التشغيل، فاتّهامه بتجاوز النصاب حكمٌ على غيب.
    */

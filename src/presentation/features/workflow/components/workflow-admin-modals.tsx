@@ -8,6 +8,8 @@
 import { useState, type FormEvent } from "react";
 import type {
   ConflictPolicy,
+  DeadlineAction,
+  DeadlineSpec,
   JoinPolicy,
   ParticipantKind,
   StageRequirementDto,
@@ -52,6 +54,8 @@ import {
 } from "../hooks/useWorkflow";
 import {
   ACTION_KIND_OPTIONS,
+  DEADLINE_ACTION_OPTIONS,
+  WEEKDAY_OPTIONS,
   CLAIM_OPTIONS,
   CONFLICT_OPTIONS,
   JOIN_OPTIONS,
@@ -213,7 +217,26 @@ export function StageModal({
   const [claimPolicy, setClaimPolicy] = useState<ClaimPolicy>(
     stage?.claimPolicy ?? "none",
   );
+  const [deadlineTime, setDeadlineTime] = useState(stage?.deadlineSpec?.time ?? "");
+  const [deadlineDays, setDeadlineDays] = useState<readonly number[]>(
+    stage?.deadlineSpec?.days ?? [],
+  );
+  const [deadlineAction, setDeadlineAction] = useState<DeadlineAction>(
+    stage?.deadlineAction ?? "notify",
+  );
   const [error, setError] = useState<string | null>(null);
+
+  // موعدٌ بلا يوم أو بلا وقت لا يُحسب، فيُحفَظ فارغًا لا ناقصًا
+  const deadlineSpec: DeadlineSpec | null =
+    deadlineTime.trim() === "" || deadlineDays.length === 0
+      ? null
+      : { time: deadlineTime, days: [...deadlineDays].sort((a, b) => a - b) };
+
+  function toggleDay(day: number) {
+    setDeadlineDays((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day],
+    );
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -239,6 +262,8 @@ export function StageModal({
         joinPolicy,
         conflictPolicy,
         claimPolicy,
+        deadlineSpec,
+        deadlineAction,
       });
       onClose();
     } catch (e) {
@@ -396,6 +421,57 @@ export function StageModal({
           )}
         </FormField>
 
+        <fieldset className="border-border flex flex-col gap-3 rounded-md border p-3 sm:col-span-2">
+          <legend className="text-content-muted px-1 text-xs">
+            {t.workflowAdmin.deadlineLegend}
+          </legend>
+          <p className="text-content-muted text-xs">{t.workflowAdmin.deadlineHint}</p>
+
+          <div className="flex flex-wrap gap-1.5">
+            {WEEKDAY_OPTIONS.map((day) => (
+              <button
+                key={day.value}
+                type="button"
+                aria-pressed={deadlineDays.includes(day.value)}
+                onClick={() => toggleDay(day.value)}
+                className={
+                  deadlineDays.includes(day.value)
+                    ? "border-primary bg-primary text-on-primary rounded-full border px-3 py-1 text-xs"
+                    : "border-border text-content-muted rounded-full border px-3 py-1 text-xs"
+                }
+              >
+                {day.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <FormField label={t.workflowAdmin.deadlineTime}>
+              {(id) => (
+                <Input
+                  id={id}
+                  type="time"
+                  dir="ltr"
+                  value={deadlineTime}
+                  onChange={(e) => setDeadlineTime(e.target.value)}
+                />
+              )}
+            </FormField>
+
+            <FormField label={t.workflowAdmin.deadlineOnBreach}>
+              {(id) => (
+                <Select
+                  id={id}
+                  options={DEADLINE_ACTION_OPTIONS}
+                  value={deadlineAction}
+                  disabled={deadlineSpec === null}
+                  onChange={(e) => setDeadlineAction(e.target.value as DeadlineAction)}
+                />
+              )}
+            </FormField>
+          </div>
+        </fieldset>
+
         <Checkbox
           label={t.workflowAdmin.isStart}
           checked={isStart}
@@ -449,6 +525,7 @@ export function ParticipantModal({
   const [roleId, setRoleId] = useState("");
   const [isOptional, setIsOptional] = useState(false);
   const [requiresSign, setRequiresSign] = useState(false);
+  const [isObserver, setIsObserver] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // `project_role` و`role` كلاهما يحمل دورًا؛ والفرق نطاق الحلّ لا شكل النموذج
@@ -465,8 +542,9 @@ export function ParticipantModal({
         userId: kind === "user" && userId !== "" ? userId : null,
         roleId: needsRole && roleId !== "" ? roleId : null,
         departmentId: null,
-        isOptional,
+        isOptional: isObserver ? false : isOptional,
         requiresSign: kind === "project_role" && requiresSign,
+        isObserver,
         sortOrder: stage.participants.length + 1,
       });
       onClose();
@@ -561,11 +639,21 @@ export function ParticipantModal({
         )}
 
         <Checkbox
-          label={t.workflowAdmin.isOptional}
-          hint={t.workflowAdmin.isOptionalHint}
-          checked={isOptional}
-          onChange={(e) => setIsOptional(e.target.checked)}
+          label={t.workflowAdmin.isObserver}
+          hint={t.workflowAdmin.isObserverHint}
+          checked={isObserver}
+          onChange={(e) => setIsObserver(e.target.checked)}
         />
+
+        {/* المراقب لا يُنتظَر أصلًا، فوصفه بالاختياريّ يُربك من يقرأ اللوحة */}
+        {!isObserver && (
+          <Checkbox
+            label={t.workflowAdmin.isOptional}
+            hint={t.workflowAdmin.isOptionalHint}
+            checked={isOptional}
+            onChange={(e) => setIsOptional(e.target.checked)}
+          />
+        )}
 
         {error !== null && (
           <p role="alert" className="text-danger text-sm">
@@ -730,6 +818,7 @@ export function ActionModal({
         />
         <Checkbox
           label={t.workflowAdmin.requiresAttachment}
+          hint={t.workflowAdmin.requiresAttachmentHint}
           checked={requiresAttachment}
           onChange={(e) => setRequiresAttachment(e.target.checked)}
         />
