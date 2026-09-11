@@ -93,4 +93,49 @@ describe("SavePipelineWorkflow UseCase", () => {
     expect(res.ok).toBe(true);
     expect(mockRepo.savePipeline).toHaveBeenCalled();
   });
+
+  it("fails if a stage targets itself", async () => {
+    const res = await useCase.execute({
+      name: "مسار تكراري",
+      transactionType: "self_loop",
+      stages: [
+        { name: "المرحلة الأولى", stageKey: "start_stage", targetStageKeys: ["start_stage"] },
+      ],
+    });
+
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.error.message).toContain("لا يمكن أن توجّه إلى نفسها");
+    }
+  });
+
+  it("fails if a stage targets a non-existent stage key", async () => {
+    const res = await useCase.execute({
+      name: "مسار بوجهة وهمية",
+      transactionType: "unknown_target",
+      stages: [
+        { name: "المرحلة الأولى", stageKey: "start_stage", targetStageKeys: ["non_existent"] },
+      ],
+    });
+
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.error.message).toContain("غير موجودة");
+    }
+  });
+
+  it("allows branching with valid targetStageKeys", async () => {
+    const res = await useCase.execute({
+      name: "مسار متفرع توازي",
+      transactionType: "fork_workflow",
+      stages: [
+        { name: "البداية", stageKey: "start", targetStageKeys: ["branch_a", "branch_b"] },
+        { name: "الفرع أ", stageKey: "branch_a", targetStageKeys: ["archive"] },
+        { name: "الفرع ب", stageKey: "branch_b", targetStageKeys: ["archive"] },
+        { name: "الأرشفة", stageKey: "archive", joinPolicy: "wait_all" },
+      ],
+    });
+
+    expect(res.ok).toBe(true);
+  });
 });

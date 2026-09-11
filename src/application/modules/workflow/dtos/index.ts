@@ -455,6 +455,7 @@ export interface PipelineStageParticipantInput {
 export interface PipelineStageInput {
   readonly name: string;
   readonly stageKey?: string;
+  readonly targetStageKeys?: readonly string[] | null | undefined;
   readonly slaMinutes?: number | null;
   readonly isArchive?: boolean;
   readonly isProgramManager?: boolean;

@@ -21,7 +21,9 @@ import {
   Clock,
   FileCheck,
   FolderPlus,
+  GitFork,
   GripVertical,
+  Layers,
   Paperclip,
   Plus,
   Sliders,
@@ -49,7 +51,10 @@ import {
   useProfiles,
   useRoles,
 } from "@presentation/features/identity/hooks/useIdentity";
-import { useSavePipelineWorkflow } from "../hooks/useWorkflow";
+import {
+  useSavePipelineWorkflow,
+  useWorkflowDefinitions,
+} from "../hooks/useWorkflow";
 import { t } from "@i18n/index";
 
 export interface StageParticipantItem {
@@ -87,6 +92,9 @@ export interface PipelineStageItem {
   // المشاركون
   participants: StageParticipantItem[];
   showAdvanced: boolean;
+  // التوجيه والتشعيب
+  targetMode: "auto" | "custom";
+  customTargets: string[];
 }
 
 interface PresetTemplate {
@@ -258,7 +266,7 @@ const PRESETS: readonly PresetTemplate[] = [
   },
 ];
 
-function createEmptyStage(index: number): PipelineStageItem {
+function createEmptyStage(index: number, defaultRoleId = ""): PipelineStageItem {
   return {
     id: `stage_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
     name: index === 0 ? "مرحلة البداية" : `المرحلة ${index + 1}`,
@@ -281,7 +289,7 @@ function createEmptyStage(index: number): PipelineStageItem {
       {
         id: `p_${Date.now()}_1`,
         kind: index === 0 ? "requester" : "project_role",
-        roleId: "",
+        roleId: index === 0 ? "" : defaultRoleId,
         userId: "",
         requiresSign: false,
         isOptional: false,
@@ -289,6 +297,8 @@ function createEmptyStage(index: number): PipelineStageItem {
       },
     ],
     showAdvanced: false,
+    targetMode: "auto",
+    customTargets: [],
   };
 }
 
@@ -302,6 +312,7 @@ export function WorkflowPipelineBuilder({
   onSuccess: (definition: WorkflowDefinitionDto) => void;
 }) {
   const savePipeline = useSavePipelineWorkflow();
+  const definitions = useWorkflowDefinitions();
   const roles = useRoles();
   const profiles = useProfiles();
 
@@ -341,6 +352,8 @@ export function WorkflowPipelineBuilder({
         },
       ],
       showAdvanced: false,
+      targetMode: "auto",
+      customTargets: [],
     },
     {
       id: "s_2",
@@ -372,6 +385,8 @@ export function WorkflowPipelineBuilder({
         },
       ],
       showAdvanced: false,
+      targetMode: "auto",
+      customTargets: [],
     },
     {
       id: "s_3",
@@ -403,8 +418,26 @@ export function WorkflowPipelineBuilder({
         },
       ],
       showAdvanced: false,
+      targetMode: "auto",
+      customTargets: [],
     },
   ]);
+
+  const defaultPmId =
+    roles.data?.find((r) => r.key === "project_manager")?.id ||
+    roles.data?.[0]?.id ||
+    "";
+  const defaultAdminId =
+    roles.data?.find((r) => r.key === "admin" || r.key === "program_manager")?.id ||
+    roles.data?.[0]?.id ||
+    defaultPmId;
+
+  function resolveParticipantRoleId(p: StageParticipantItem): string {
+    if (p.roleId) return p.roleId;
+    if (p.kind === "project_role") return defaultPmId;
+    if (p.kind === "role") return defaultAdminId;
+    return "";
+  }
 
   // سحب وإفلات
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -412,10 +445,28 @@ export function WorkflowPipelineBuilder({
   const [dragEnabledIndex, setDragEnabledIndex] = useState<number | null>(null);
 
   function applyPreset(preset: PresetTemplate) {
+    const pmId =
+      roles.data?.find((r) => r.key === "project_manager")?.id || "";
+    const engId =
+      roles.data?.find((r) => r.key === "engineer")?.id || pmId;
+    const adminId =
+      roles.data?.find((r) => r.key === "admin" || r.key === "program_manager")?.id || pmId;
+
+    function resolveRole(kind: string, stageKey: string): string {
+      if (kind === "project_role") {
+        if (stageKey.includes("tech") || stageKey.includes("inspect")) return engId;
+        return pmId;
+      }
+      if (kind === "role") {
+        return adminId;
+      }
+      return "";
+    }
+
     if (preset.name === "قالب فارغ (البدء من الصفر)") {
       setName("");
       setTransactionType("");
-      setStages([createEmptyStage(0)]);
+      setStages([createEmptyStage(0, pmId)]);
       return;
     }
     setName(preset.name);
@@ -443,20 +494,24 @@ export function WorkflowPipelineBuilder({
         participants: s.participants.map((p, pIdx) => ({
           id: `preset_p_${idx}_${pIdx}`,
           kind: p.kind,
-          roleId: p.roleId ?? "",
+          roleId: p.roleId || resolveRole(p.kind, s.stageKey),
           userId: p.userId ?? "",
           requiresSign: p.requiresSign ?? false,
           isOptional: p.isOptional ?? false,
           isObserver: p.isObserver ?? false,
         })),
         showAdvanced: false,
+        targetMode: "auto",
+        customTargets: [],
       })),
     );
   }
 
   function handleAddStage(atIndex?: number) {
     const insertAt = atIndex !== undefined ? atIndex : stages.length;
-    const newStage = createEmptyStage(insertAt);
+    const pmId =
+      roles.data?.find((r) => r.key === "project_manager")?.id || "";
+    const newStage = createEmptyStage(insertAt, pmId);
     const updated = [...stages];
     updated.splice(insertAt, 0, newStage);
     setStages(updated);
@@ -566,14 +621,85 @@ export function WorkflowPipelineBuilder({
       setError("رمز نوع المعاملة يقبل الحروف الإنجليزية الصغيرة والأرقام والشرطة السفلية _ فقط وبدون مسافات");
       return;
     }
+
+    // التحقق من أن رمز نوع المعاملة غير مستخدم مسبقاً في مسار آخر
+    const existingDef = definitions.data?.find(
+      (d) => d.transactionType.toLowerCase() === cleanType.toLowerCase(),
+    );
+    if (existingDef) {
+      setError(
+        `رمز نوع المعاملة «${cleanType}» مستخدم بالفعل في مسار «${existingDef.name}». يرجى كتابة رمز مختلف للمعاملة.`,
+      );
+      return;
+    }
+
     if (stages.length === 0) {
       setError("يجب إضافة مرحلة واحدة على الأقل في المسار");
       return;
     }
+
+    // التحقق من صحة المراحل وعدم تكرار رموزها
+    const seenStageKeys = new Map<string, number>();
     for (let i = 0; i < stages.length; i++) {
       const stageItem = stages[i];
       if (!stageItem || !stageItem.name.trim()) {
         setError(`اسم المرحلة رقم ${i + 1} مطلوب`);
+        return;
+      }
+      const key = stageItem.stageKey.trim();
+      if (!key) {
+        setError(`رمز المرحلة رقم ${i + 1} («${stageItem.name}») مطلوب`);
+        return;
+      }
+      if (!/^[a-z][a-z0-9_]{1,39}$/.test(key)) {
+        setError(
+          `رمز المرحلة «${stageItem.name}» غير صالح («${key}»). يجب أن يبدأ بحرف إنجليزي صغير ويحتوي فقط على حروف إنجليزية وأرقام وشرطة سفلية _ وبطول 2 إلى 40 حرفاً.`,
+        );
+        return;
+      }
+      if (seenStageKeys.has(key)) {
+        const prevIdx = seenStageKeys.get(key)! + 1;
+        setError(
+          `رمز المرحلة «${key}» مكرر في المرحلة رقم ${prevIdx} والمرحلة رقم ${i + 1}. يجب أن يكون لكل مرحلة رمز إنجليزي فريد.`,
+        );
+        return;
+      }
+      seenStageKeys.set(key, i);
+    }
+
+    // التحقق من المشاركين في كل مرحلة وعدم ترك الدور فارغاً
+    for (const stageItem of stages) {
+      if (!stageItem.participants || stageItem.participants.length === 0) {
+        setError(`المرحلة «${stageItem.name}» يجب أن تحتوي على مشارك واحد على الأقل`);
+        return;
+      }
+      for (const [pIdx, p] of stageItem.participants.entries()) {
+        if (p.kind === "role" || p.kind === "project_role") {
+          const effectiveRoleId = resolveParticipantRoleId(p);
+          if (!effectiveRoleId || effectiveRoleId.trim() === "") {
+            setError(
+              `يرجى اختيار الدور المطلوب للمشارك رقم ${pIdx + 1} في المرحلة «${stageItem.name}»`,
+            );
+            return;
+          }
+        }
+        if (p.kind === "user") {
+          if (!p.userId || p.userId.trim() === "") {
+            setError(
+              `يرجى اختيار الموظف المحدد للمشارك رقم ${pIdx + 1} في المرحلة «${stageItem.name}»`,
+            );
+            return;
+          }
+        }
+      }
+    }
+
+    // التحقق من صحة الوجهات المخصصة إن تم تفعيلها
+    for (const s of stages) {
+      if (s.targetMode === "custom" && (!s.customTargets || s.customTargets.length === 0)) {
+        setError(
+          `المرحلة «${s.name}» في وضع التوجيه المخصص لكن لم يتم اختيار أي وجهة تالية لها. يرجى اختيار وجهة أو إرجاعها للوضع التلقائي.`,
+        );
         return;
       }
     }
@@ -590,9 +716,13 @@ export function WorkflowPipelineBuilder({
           // حساب إجمالي الدقائق للإرجاع
           const totalReturn = (s.returnHours * 60) + s.returnMinutes;
 
+          const isCustomRouting =
+            s.targetMode === "custom" && s.customTargets && s.customTargets.length > 0;
+
           return {
             name: s.name.trim(),
-            stageKey: s.stageKey.trim() || `stage_${idx + 1}`,
+            stageKey: s.stageKey.trim(),
+            targetStageKeys: isCustomRouting ? s.customTargets : undefined,
             slaMinutes: totalSla > 0 ? totalSla : null,
             // المرحلة الأولى لا تكون مرحلة أرشفة مطلقاً
             isArchive: idx > 0 && (idx === stages.length - 1 || s.isArchive),
@@ -603,17 +733,20 @@ export function WorkflowPipelineBuilder({
             requiresReceive: s.requiresReceive,
             isProgramManager: s.isProgramManager,
             returnMinutes: totalReturn > 0 ? totalReturn : null,
-            participants: s.participants.map((p) => ({
-              kind: p.kind,
-              roleId:
-                p.kind === "role" || p.kind === "project_role"
-                  ? p.roleId || null
-                  : null,
-              userId: p.kind === "user" ? p.userId || null : null,
-              requiresSign: p.kind === "project_role" && p.requiresSign,
-              isOptional: p.isOptional,
-              isObserver: p.isObserver,
-            })),
+            participants: s.participants.map((p) => {
+              const effectiveRoleId = resolveParticipantRoleId(p);
+              return {
+                kind: p.kind,
+                roleId:
+                  p.kind === "role" || p.kind === "project_role"
+                    ? effectiveRoleId || null
+                    : null,
+                userId: p.kind === "user" ? p.userId || null : null,
+                requiresSign: p.kind === "project_role" && p.requiresSign,
+                isOptional: p.isOptional,
+                isObserver: p.isObserver,
+              };
+            }),
             requirements: s.requiresAttachment
               ? [
                   {
@@ -657,6 +790,7 @@ export function WorkflowPipelineBuilder({
               variant="primary"
               onClick={handleSave}
               isLoading={savePipeline.isPending}
+              disabled={savePipeline.isPending}
               startIcon={<Sparkles aria-hidden className="size-4" />}
             >
               {t.workflowAdmin.saveAndGeneratePipeline}
@@ -674,6 +808,21 @@ export function WorkflowPipelineBuilder({
             <span>{error}</span>
           </div>
         )}
+
+        {/* دليل إرشادي لتوضيح التسلسل والتفرع */}
+        <div className="bg-primary/5 border border-primary/20 rounded-xl p-3.5 text-xs text-content flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-start gap-2.5">
+            <Sparkles className="size-4 text-primary shrink-0 mt-0.5" />
+            <div className="flex flex-col gap-0.5">
+              <span className="font-bold text-sm text-content">
+                منشئ مسارات سير العمل السريع (مع دعم التفرع والتوازي)
+              </span>
+              <p className="text-content-muted leading-relaxed">
+                بشكل افتراضي تسير المعاملة خطياً بالتسلسل الطبيعي (<span className="font-semibold text-content" dir="ltr">1 → 2 → 3</span>). لتشعيب المسار (توازي أو تخطي مراحل)، يمكنك في أي مرحلة التبديل إلى خيار «مخصص / توازي» لاختيار وجهاتها بحرية، وضبط سياسة الالتقاء في مرحلة التجميع اللاحقة على <strong className="text-blue-600 dark:text-blue-400">انتظار الجميع (wait_all)</strong>.
+              </p>
+            </div>
+          </div>
+        </div>
 
         {/* شريط القوالب السريعة */}
         <section className="bg-surface-sunken border-border flex flex-col gap-2.5 rounded-xl border p-4">
@@ -896,6 +1045,29 @@ export function WorkflowPipelineBuilder({
                       />
                     </div>
 
+                    {/* رمز المرحلة (إنجليزي فريد) */}
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center justify-between">
+                        <label className="text-content-muted text-xs font-medium">
+                          رمز المرحلة (إنجليزي فريد)
+                        </label>
+                        <span className="text-content-muted font-mono text-[10px]" dir="ltr">
+                          a-z, 0-9, _
+                        </span>
+                      </div>
+                      <Input
+                        dir="ltr"
+                        value={stage.stageKey}
+                        onChange={(e) =>
+                          updateStage(index, {
+                            stageKey: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""),
+                          })
+                        }
+                        placeholder={`stage_${index + 1}`}
+                        className="font-mono text-xs"
+                      />
+                    </div>
+
                     {/* المشاركون في المرحلة */}
                     <div className="flex flex-col gap-2">
                       <div className="flex items-center justify-between">
@@ -954,33 +1126,49 @@ export function WorkflowPipelineBuilder({
                             />
 
                             {(p.kind === "role" || p.kind === "project_role") && (
-                              <Select
-                                value={p.roleId}
-                                onChange={(e) =>
-                                  updateParticipant(index, pIdx, { roleId: e.target.value })
-                                }
-                                placeholder="اختر الدور المطلوب..."
-                                options={(roles.data ?? []).map((r) => ({
-                                  value: r.id,
-                                  label: r.name,
-                                }))}
-                              />
+                              <div className="flex flex-col gap-1">
+                                <Select
+                                  value={resolveParticipantRoleId(p)}
+                                  onChange={(e) =>
+                                    updateParticipant(index, pIdx, { roleId: e.target.value })
+                                  }
+                                  placeholder="اختر الدور المطلوب..."
+                                  className={!resolveParticipantRoleId(p) ? "border-amber-500 ring-1 ring-amber-500/30" : ""}
+                                  options={(roles.data ?? []).map((r) => ({
+                                    value: r.id,
+                                    label: r.name,
+                                  }))}
+                                />
+                                {!resolveParticipantRoleId(p) && (
+                                  <span className="text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                                    * يرجى اختيار الدور المطلوب
+                                  </span>
+                                )}
+                              </div>
                             )}
 
                             {p.kind === "user" && (
-                              <Select
-                                value={p.userId}
-                                onChange={(e) =>
-                                  updateParticipant(index, pIdx, { userId: e.target.value })
-                                }
-                                placeholder="اختر الموظف..."
-                                options={(profiles.data ?? [])
-                                  .filter((prof) => prof.isActive)
-                                  .map((prof) => ({
-                                    value: prof.id,
-                                    label: prof.fullName,
-                                  }))}
-                              />
+                              <div className="flex flex-col gap-1">
+                                <Select
+                                  value={p.userId}
+                                  onChange={(e) =>
+                                    updateParticipant(index, pIdx, { userId: e.target.value })
+                                  }
+                                  placeholder="اختر الموظف..."
+                                  className={!p.userId ? "border-amber-500 ring-1 ring-amber-500/30" : ""}
+                                  options={(profiles.data ?? [])
+                                    .filter((prof) => prof.isActive)
+                                    .map((prof) => ({
+                                      value: prof.id,
+                                      label: prof.fullName,
+                                    }))}
+                                />
+                                {!p.userId && (
+                                  <span className="text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                                    * يرجى اختيار الموظف المحدد
+                                  </span>
+                                )}
+                              </div>
                             )}
 
                             <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
@@ -1355,6 +1543,136 @@ export function WorkflowPipelineBuilder({
                         </div>
                       </div>
                     )}
+
+                    {/* خيار سياسة الالتقاء والتجميع wait_all إن كان مفعلاً */}
+                    {stage.joinPolicy === "wait_all" && (
+                      <div className="flex items-center gap-2 rounded-lg bg-blue-50 dark:bg-blue-950/60 border border-blue-300 dark:border-blue-700/80 px-2.5 py-1.5 text-xs text-blue-950 dark:text-blue-100 font-medium shadow-xs">
+                        <Layers className="size-4 shrink-0 text-blue-700 dark:text-blue-300" />
+                        <span>محطة تجميع (wait_all): تنتظر اكتمال كافة الفروع السابقة قبل الفتح</span>
+                      </div>
+                    )}
+
+                    {/* قسم المرحلة التالية والتوجيه */}
+                    <div className="bg-surface-sunken border-border/80 flex flex-col gap-2 rounded-lg border p-2.5 text-xs">
+                      <div className="flex items-center justify-between">
+                        <label className="text-content font-bold flex items-center gap-1.5">
+                          <ArrowLeft className="size-3.5 text-primary" />
+                          <span>المرحلة التالية بعد الاعتماد:</span>
+                        </label>
+
+                        {!isLast && (
+                          <div className="flex items-center gap-1 text-[11px]">
+                            <button
+                              type="button"
+                              onClick={() => updateStage(index, { targetMode: "auto" })}
+                              className={`rounded px-2 py-0.5 font-medium transition-all ${
+                                stage.targetMode === "auto"
+                                  ? "bg-primary text-white font-semibold shadow-xs"
+                                  : "text-content-muted hover:text-content hover:bg-surface"
+                              }`}
+                            >
+                              تلقائي
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const defaultTarget = stages[index + 1]?.stageKey || "";
+                                updateStage(index, {
+                                  targetMode: "custom",
+                                  customTargets:
+                                    stage.customTargets.length > 0
+                                      ? stage.customTargets
+                                      : defaultTarget
+                                        ? [defaultTarget]
+                                        : [],
+                                });
+                              }}
+                              className={`rounded px-2 py-0.5 font-medium transition-all ${
+                                stage.targetMode === "custom"
+                                  ? "bg-amber-600 text-white font-semibold shadow-xs"
+                                  : "text-content-muted hover:text-content hover:bg-surface"
+                              }`}
+                            >
+                              مخصص / توازي
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {isLast ? (
+                        <div className="text-content-muted flex items-center gap-1.5 bg-surface rounded border border-border/60 px-2 py-1.5 text-[11px]">
+                          <CheckCircle2 className="size-3.5 text-success shrink-0" />
+                          <span className="font-medium text-content">المرحلة الختامية: إغلاق وأرشفة المعاملة</span>
+                        </div>
+                      ) : stage.targetMode === "auto" ? (
+                        <div className="text-content-muted flex items-center gap-1.5 bg-surface rounded border border-border/60 px-2 py-1.5 text-[11px]">
+                          <span className="font-semibold text-content">التسلسل الطبيعي:</span>
+                          <span className="text-primary font-medium flex items-center gap-1">
+                            <span>{stages[index + 1]?.name || `المرحلة ${index + 2}`}</span>
+                            <span className="font-mono text-[10px] text-content-muted">
+                              ({stages[index + 1]?.stageKey})
+                            </span>
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-2 pt-0.5">
+                          <p className="text-content-muted text-[11px]">
+                            اختر مرحلة أو أكثر لتنتقل إليها المعاملة عند الاعتماد (اختيار أكثر من مرحلة ينشئ تفرعاً متوازياً):
+                          </p>
+
+                          <div className="grid grid-cols-1 gap-1 max-h-32 overflow-y-auto">
+                            {stages
+                              .filter((_, otherIdx) => otherIdx !== index)
+                              .map((otherStage, otherIdx) => {
+                                const isChecked = stage.customTargets.includes(otherStage.stageKey);
+                                return (
+                                  <label
+                                    key={otherStage.id || otherIdx}
+                                    className={`flex items-center justify-between rounded-md border p-1.5 cursor-pointer text-[11px] transition-all ${
+                                      isChecked
+                                        ? "border-amber-500/60 bg-amber-500/10 font-medium text-amber-900 dark:text-amber-200"
+                                        : "border-border bg-surface text-content hover:bg-surface-sunken"
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-1.5">
+                                      <input
+                                        type="checkbox"
+                                        checked={isChecked}
+                                        onChange={(e) => {
+                                          const nextTargets = e.target.checked
+                                            ? [...stage.customTargets, otherStage.stageKey]
+                                            : stage.customTargets.filter((k) => k !== otherStage.stageKey);
+                                          updateStage(index, { customTargets: nextTargets });
+                                        }}
+                                        className="text-amber-600 rounded border-gray-300"
+                                      />
+                                      <span>{otherStage.name || `مرحلة ${otherStage.stageKey}`}</span>
+                                    </div>
+                                    <span className="font-mono text-[10px] text-content-muted" dir="ltr">
+                                      {otherStage.stageKey}
+                                    </span>
+                                  </label>
+                                );
+                              })}
+                          </div>
+
+                          {stage.customTargets.length > 1 && (
+                            <div className="flex items-center gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700/80 p-2 text-xs text-amber-950 dark:text-amber-100 shadow-xs">
+                              <GitFork className="size-4 shrink-0 text-amber-700 dark:text-amber-300" />
+                              <span className="leading-relaxed">
+                                <strong className="font-bold text-amber-900 dark:text-amber-200">تفرع متوازي ({stage.customTargets.length} فروع):</strong> ستسير هذه الفروع معاً في نفس الوقت بعد اعتماد هذه المرحلة.
+                              </span>
+                            </div>
+                          )}
+
+                          {stage.customTargets.length === 0 && (
+                            <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                              * يرجى تحديد مرحلة واحدة على الأقل كوجهة بعد الاعتماد
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -1425,20 +1743,77 @@ export function WorkflowPipelineBuilder({
               </div>
             </div>
 
-            {/* شريط تسلسل المراحل بصريًا */}
-            <div className="border-border/60 mt-2 flex flex-wrap items-center gap-2 border-t pt-2">
-              {stages.map((stage, idx) => (
-                <div key={idx} className="flex items-center gap-2">
-                  <span className="border-border bg-surface text-content rounded-md border px-2.5 py-1 font-semibold">
-                    {idx + 1}. {stage.name || `المرحلة ${idx + 1}`}
-                  </span>
-                  {idx < stages.length - 1 && (
-                    <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                      <ArrowLeft className="size-3.5" />
+            {/* خريطة التدفق البصري للمسار */}
+            <div className="border-border/60 mt-2 flex flex-col gap-2 border-t pt-2">
+              <span className="text-content font-bold text-xs">خريطة التدفق البصري للمسار:</span>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {stages.map((stage, idx) => {
+                  const isCustom = stage.targetMode === "custom";
+                  const isLast = idx === stages.length - 1 && stage.isArchive;
+
+                  let nextStageNames: string[];
+                  if (isLast) {
+                    nextStageNames = ["إغلاق وأرشفة المعاملة"];
+                  } else if (isCustom) {
+                    const mapped = stage.customTargets.map(
+                      (k) => stages.find((st) => st.stageKey === k)?.name || k,
+                    );
+                    nextStageNames = mapped.length > 0 ? mapped : ["(لم يتم تحديد وجهة)"];
+                  } else if (idx < stages.length - 1) {
+                    nextStageNames = [stages[idx + 1]?.name || `المرحلة ${idx + 2}`];
+                  } else {
+                    nextStageNames = ["إغلاق وأرشفة المعاملة"];
+                  }
+
+                  const isFork = nextStageNames.length > 1;
+
+                  return (
+                    <div
+                      key={stage.id || idx}
+                      className={`rounded-lg border p-2 flex flex-col gap-1.5 text-[11px] ${
+                        isFork
+                          ? "border-amber-400 dark:border-amber-700/80 bg-amber-50/80 dark:bg-amber-950/40 text-amber-950 dark:text-amber-100"
+                          : stage.joinPolicy === "wait_all"
+                            ? "border-blue-400 dark:border-blue-700/80 bg-blue-50/80 dark:bg-blue-950/40 text-blue-950 dark:text-blue-100"
+                            : "border-border bg-surface text-content"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold flex items-center gap-1.5">
+                          <span className="bg-primary/10 text-primary size-4 rounded-full inline-flex items-center justify-center text-[10px]">
+                            {idx + 1}
+                          </span>
+                          <span>{stage.name || `المرحلة ${idx + 1}`}</span>
+                        </span>
+                        {stage.joinPolicy === "wait_all" && (
+                          <Badge tone="info">wait_all</Badge>
+                        )}
+                        {isFork && (
+                          <Badge tone="warning">تفرع توازي ({nextStageNames.length})</Badge>
+                        )}
+                      </div>
+
+                      <div className="flex items-start gap-1.5 text-content-muted pt-0.5">
+                        <ArrowLeft className="size-3 text-primary shrink-0 mt-0.5" />
+                        <div className="flex flex-wrap gap-1">
+                          {nextStageNames.map((n, nIdx) => (
+                            <span
+                              key={nIdx}
+                              className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                                isFork
+                                  ? "bg-amber-200/70 dark:bg-amber-900/60 text-amber-950 dark:text-amber-100 border border-amber-300 dark:border-amber-700"
+                                  : "bg-surface-sunken text-content border border-border/50"
+                              }`}
+                            >
+                              {n}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                  )}
-                </div>
-              ))}
+                  );
+                })}
+              </div>
             </div>
           </div>
         </section>

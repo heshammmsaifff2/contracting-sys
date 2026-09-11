@@ -116,6 +116,7 @@ export class SavePipelineWorkflow implements UseCase<
         }),
       );
     }
+    const stageKeys = new Set<string>();
     for (let i = 0; i < input.stages.length; i++) {
       const stage = input.stages[i];
       if (!stage || !stage.name || stage.name.trim().length === 0) {
@@ -125,7 +126,86 @@ export class SavePipelineWorkflow implements UseCase<
           }),
         );
       }
+      if (stage.stageKey && stage.stageKey.trim().length > 0) {
+        const key = stage.stageKey.trim();
+        if (!/^[a-z][a-z0-9_]{1,39}$/.test(key)) {
+          return err(
+            new ValidationError(
+              `رمز المرحلة رقم ${i + 1} (${key}) غير صالح — يجب أن يبدأ بحرف إنجليزي صغير ويحتوي فقط على حروف إنجليزية وأرقام و_ وبطول 2 إلى 40 حرفاً`,
+              { [`stages.${i}.stageKey`]: "pattern" },
+            ),
+          );
+        }
+        if (stageKeys.has(key)) {
+          return err(
+            new ValidationError(
+              `رمز المرحلة «${key}» مكرر في أكثر من مرحلة داخل هذا المسار. يجب أن يكون لكل مرحلة رمز فريد`,
+              { [`stages.${i}.stageKey`]: "duplicate" },
+            ),
+          );
+        }
+        stageKeys.add(key);
+      }
+
+      if (stage.participants) {
+        for (let pIdx = 0; pIdx < stage.participants.length; pIdx++) {
+          const p = stage.participants[pIdx];
+          if (!p) continue;
+          if (p.kind === "role" || p.kind === "project_role") {
+            if (!p.roleId || p.roleId.trim().length === 0) {
+              return err(
+                new ValidationError(
+                  `يرجى تحديد الدور المطلوب للمشارك في المرحلة «${stage.name}»`,
+                  { [`stages.${i}.participants.${pIdx}.roleId`]: "required" },
+                ),
+              );
+            }
+          }
+          if (p.kind === "user") {
+            if (!p.userId || p.userId.trim().length === 0) {
+              return err(
+                new ValidationError(
+                  `يرجى تحديد الموظف المطلوب للمشارك في المرحلة «${stage.name}»`,
+                  { [`stages.${i}.participants.${pIdx}.userId`]: "required" },
+                ),
+              );
+            }
+          }
+        }
+      }
     }
+
+    // التحقق من صحة الوجهات المستهدفة (targetStageKeys) إن وُجدت
+    const allStageKeys = new Set(
+      input.stages.map((s, idx) => (s.stageKey?.trim() || `stage_${idx + 1}`).toLowerCase()),
+    );
+    for (let i = 0; i < input.stages.length; i++) {
+      const s = input.stages[i];
+      if (!s) continue;
+      const currentKey = (s.stageKey?.trim() || `stage_${i + 1}`).toLowerCase();
+      if (s.targetStageKeys && s.targetStageKeys.length > 0) {
+        for (const target of s.targetStageKeys) {
+          const tKey = target.trim().toLowerCase();
+          if (tKey === currentKey) {
+            return err(
+              new ValidationError(
+                `المرحلة «${s.name}» لا يمكن أن توجّه إلى نفسها`,
+                { [`stages.${i}.targetStageKeys`]: "self_reference" },
+              ),
+            );
+          }
+          if (!allStageKeys.has(tKey)) {
+            return err(
+              new ValidationError(
+                `المرحلة المستهدفة «${target}» غير موجودة في مراحل هذا المسار`,
+                { [`stages.${i}.targetStageKeys`]: "not_found" },
+              ),
+            );
+          }
+        }
+      }
+    }
+
     return this.repo.savePipeline(input);
   }
 }

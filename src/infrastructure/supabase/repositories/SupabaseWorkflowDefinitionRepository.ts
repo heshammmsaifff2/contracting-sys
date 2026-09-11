@@ -469,8 +469,17 @@ export class SupabaseWorkflowDefinitionRepository implements IWorkflowDefinition
       if (defError) return err(toDomainDbError(defError, { entity: "مسار سير العمل" }));
       const definitionId = defData.id;
 
+      const rollback = async () => {
+        try {
+          await this.client.from("workflow_definitions").delete().eq("id", definitionId);
+        } catch {
+          // ignore rollback errors
+        }
+      };
+
       // 2. إنشاء المراحل بالترتيب
       const stageIds: string[] = [];
+      const stageKeyToId = new Map<string, string>();
       const stageCount = input.stages.length;
 
       for (let i = 0; i < stageCount; i++) {
@@ -509,22 +518,40 @@ export class SupabaseWorkflowDefinitionRepository implements IWorkflowDefinition
           .select("id")
           .single();
 
-        if (stageError) return err(toDomainDbError(stageError, { entity: "مرحلة سير العمل" }));
+        if (stageError) {
+          await rollback();
+          return err(toDomainDbError(stageError, { entity: "مرحلة سير العمل" }));
+        }
         stageIds.push(stageData.id);
+        stageKeyToId.set(stageKey.toLowerCase(), stageData.id);
       }
 
       // 3. ربط المرحلة التالية الافتراضية default_next_stage_id
-      for (let i = 0; i < stageIds.length - 1; i++) {
+      for (let i = 0; i < stageCount; i++) {
         const currentId = stageIds[i];
-        const nextId = stageIds[i + 1];
-        if (!currentId || !nextId) continue;
+        if (!currentId) continue;
+        const s = input.stages[i];
+        let defaultNextId: string | null = null;
+        if (s?.targetStageKeys && s.targetStageKeys.length > 0) {
+          const firstTargetKey = s.targetStageKeys[0]?.trim().toLowerCase();
+          if (firstTargetKey) {
+            defaultNextId = stageKeyToId.get(firstTargetKey) ?? null;
+          }
+        } else if (i < stageIds.length - 1) {
+          defaultNextId = stageIds[i + 1] ?? null;
+        }
 
-        const { error: linkError } = await this.client
-          .from("workflow_stages")
-          .update({ default_next_stage_id: nextId })
-          .eq("id", currentId);
+        if (defaultNextId) {
+          const { error: linkError } = await this.client
+            .from("workflow_stages")
+            .update({ default_next_stage_id: defaultNextId })
+            .eq("id", currentId);
 
-        if (linkError) return err(toDomainDbError(linkError, { entity: "ربط المرحلة التالية" }));
+          if (linkError) {
+            await rollback();
+            return err(toDomainDbError(linkError, { entity: "ربط المرحلة التالية" }));
+          }
+        }
       }
 
       // 4. تعيين المشاركين وشروط الجاهزية
@@ -578,7 +605,10 @@ export class SupabaseWorkflowDefinitionRepository implements IWorkflowDefinition
             .from("workflow_stage_participants")
             .insert(participantPayload);
 
-          if (partError) return err(toDomainDbError(partError, { entity: "مشارك المرحلة" }));
+          if (partError) {
+            await rollback();
+            return err(toDomainDbError(partError, { entity: "مشارك المرحلة" }));
+          }
         }
 
         // إدراج شروط الجاهزية (مثل اشتراط إرفاق مستندات قبل المتابعة)
@@ -598,8 +628,10 @@ export class SupabaseWorkflowDefinitionRepository implements IWorkflowDefinition
                 sort_order: rIdx + 1,
               });
 
-            if (reqError)
+            if (reqError) {
+              await rollback();
               return err(toDomainDbError(reqError, { entity: "شرط الجاهزية" }));
+            }
           }
         }
       }
@@ -613,10 +645,18 @@ export class SupabaseWorkflowDefinitionRepository implements IWorkflowDefinition
           if (!currentStageId) continue;
           const isFinal = i === stageCount - 1;
 
-          if (!isFinal) {
+          // تحديد الوجهات التالية لهذه المرحلة
+          let targetIds: string[] = [];
+          if (s?.targetStageKeys && s.targetStageKeys.length > 0) {
+            targetIds = s.targetStageKeys
+              .map((k) => stageKeyToId.get(k.trim().toLowerCase()))
+              .filter((id): id is string => Boolean(id));
+          } else if (!isFinal && i < stageCount - 1) {
             const nextStageId = stageIds[i + 1];
-            if (!nextStageId) continue;
+            if (nextStageId) targetIds = [nextStageId];
+          }
 
+          if (targetIds.length > 0) {
             // زر الاعتماد والتقدم (Forward)
             const { data: forwardAction, error: fwdErr } = await this.client
               .from("workflow_actions")
@@ -634,19 +674,27 @@ export class SupabaseWorkflowDefinitionRepository implements IWorkflowDefinition
               .select("id")
               .single();
 
-            if (fwdErr) return err(toDomainDbError(fwdErr, { entity: "إجراء اعتماد المرحلة" }));
+            if (fwdErr) {
+              await rollback();
+              return err(toDomainDbError(fwdErr, { entity: "إجراء اعتماد المرحلة" }));
+            }
 
-            // مسار للأمام
-            const { error: routeErr } = await this.client
-              .from("workflow_action_routes")
-              .insert({
-                action_id: forwardAction.id,
-                priority: 1,
-                condition: null,
-                target_stage_id: nextStageId,
-              });
+            // مسارات للأمام (إذا كانت وجهات متعددة، فجميعها تأخذ نفس الأولوية 1 لتشكيل تفرع متوازي)
+            for (const targetId of targetIds) {
+              const { error: routeErr } = await this.client
+                .from("workflow_action_routes")
+                .insert({
+                  action_id: forwardAction.id,
+                  priority: 1,
+                  condition: null,
+                  target_stage_id: targetId,
+                });
 
-            if (routeErr) return err(toDomainDbError(routeErr, { entity: "مسار الإجراء للأمام" }));
+              if (routeErr) {
+                await rollback();
+                return err(toDomainDbError(routeErr, { entity: "مسار الإجراء للأمام" }));
+              }
+            }
           } else {
             // زر الإغلاق والأرشفة للمرحلة النهائية
             const { error: finalErr } = await this.client
@@ -663,7 +711,10 @@ export class SupabaseWorkflowDefinitionRepository implements IWorkflowDefinition
                 return_minutes: null,
               });
 
-            if (finalErr) return err(toDomainDbError(finalErr, { entity: "إجراء إغلاق المسار" }));
+            if (finalErr) {
+              await rollback();
+              return err(toDomainDbError(finalErr, { entity: "إجراء إغلاق المسار" }));
+            }
           }
 
           // زر الإرجاع / الرفض للمراحل اللاحقة للأولى
@@ -686,7 +737,10 @@ export class SupabaseWorkflowDefinitionRepository implements IWorkflowDefinition
                 .select("id")
                 .single();
 
-              if (bwdErr) return err(toDomainDbError(bwdErr, { entity: "إجراء إرجاع المرحلة" }));
+              if (bwdErr) {
+                await rollback();
+                return err(toDomainDbError(bwdErr, { entity: "إجراء إرجاع المرحلة" }));
+              }
 
               // مسار للخلف
               const { error: bwdRouteErr } = await this.client
@@ -698,7 +752,10 @@ export class SupabaseWorkflowDefinitionRepository implements IWorkflowDefinition
                   target_stage_id: prevStageId,
                 });
 
-              if (bwdRouteErr) return err(toDomainDbError(bwdRouteErr, { entity: "مسار الإجراء للخلف" }));
+              if (bwdRouteErr) {
+                await rollback();
+                return err(toDomainDbError(bwdRouteErr, { entity: "مسار الإجراء للخلف" }));
+              }
             }
           }
 
@@ -717,7 +774,10 @@ export class SupabaseWorkflowDefinitionRepository implements IWorkflowDefinition
               return_minutes: null,
             });
 
-          if (noteErr) return err(toDomainDbError(noteErr, { entity: "إجراء ملاحظة المرحلة" }));
+          if (noteErr) {
+            await rollback();
+            return err(toDomainDbError(noteErr, { entity: "إجراء ملاحظة المرحلة" }));
+          }
         }
       }
 
@@ -729,7 +789,10 @@ export class SupabaseWorkflowDefinitionRepository implements IWorkflowDefinition
         .single()
         .overrideTypes<DefinitionRow>();
 
-      if (fetchErr) return err(toDomainDbError(fetchErr, { entity: "مسار سير العمل" }));
+      if (fetchErr) {
+        await rollback();
+        return err(toDomainDbError(fetchErr, { entity: "مسار سير العمل" }));
+      }
       return ok(toDto(fullDef));
     } catch (e) {
       return err(toDomainError(e, "تعذّر حفظ مسار خط الأنابيب"));
