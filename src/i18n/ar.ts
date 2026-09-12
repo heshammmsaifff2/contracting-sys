@@ -689,6 +689,8 @@ export const ar = {
     employee: "الموظف",
     isProgramManager: "مرحلة مدير البرنامج",
     isArchive: "مرحلة الأرشيف",
+    stageReview: "مراجعة",
+    editInBuilder: "تعديل في المنشئ",
     isStart: "بداية المسار",
     isFinal: "نهاية المسار",
     requiresReceive: "يلزم الاستلام قبل الإجراء",
@@ -856,6 +858,11 @@ export const ar = {
     // منشئ المسارات السريع (Pipeline Builder)
     pipelineBuilder: "منشئ المسار السريع",
     pipelineBuilderTitle: "منشئ المسار السريع (Pipeline)",
+    pipelineEditTitle: "تعديل المسودّة",
+    pipelineEditSubtitle:
+      "تُعدَّل بنفس طريقة بنائها — وما تحفظه يحلّ محلّ محتوى المسودّة كاملًا",
+    saveDraftEdits: "حفظ التعديلات",
+    saveEditsAndPublish: "حفظ التعديلات ونشر المسار",
     pipelineBuilderSubtitle:
       "أنشئ مسار العمل كاملاً بخطوات متسلسلة بالسحب والإفلات مع ربط التوجيه تلقائيًا",
     customModalAdd: "مسار جديد (مخصص)",
@@ -880,7 +887,8 @@ export const ar = {
     requiresAttachShort: "يلزم مرفق",
     requiresReceiveShort: "يلزم استلام",
     publishImmediately: "نشر المسار وتفعيله فوراً (Publish)",
-    publishImmediatelyHint: "يفحص موانع النشر ويُفعّل المسار فور الحفظ لتبدأ المعاملات بالدخول فيه مباشرة",
+    publishImmediatelyHint:
+      "يفحص موانع النشر ويُفعّل المسار فور الحفظ لتبدأ المعاملات بالدخول فيه مباشرة",
     saveAndPublishPipeline: "إنشاء وحفظ ونشر المسار فوراً",
     customActionsTitle: "تخصيص الأزرار والتوجيهات",
     customActionsHint: "أزرار مخصصة وتحديد ألوانها ومساراتها الشرطية",
@@ -924,6 +932,7 @@ export const ar = {
     issueNoFinal: "لا مرحلة نهائية",
     issueUnreachable: "مرحلة لا تُوصَل",
     issueDeadEnd: "مرحلة بلا مخرج",
+    issueNoDecisiveAction: "مرحلة بلا زرّ يحسم",
     issueActionWithoutRoute: "زرّ بلا وجهة",
     issueRouteToMissing: "وجهة خارج المسار",
     issueNoParticipants: "مرحلة بلا مشاركين",

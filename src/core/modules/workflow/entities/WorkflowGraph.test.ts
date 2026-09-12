@@ -69,7 +69,12 @@ function healthyStages(): GraphStage[] {
         }),
       ],
     }),
-    stage({ id: "done", isFinal: true }),
+    // المرحلة النهائية تُفتَح كغيرها، فتلزمها زرٌّ يُغلقها — وإلّا وقفت
+    stage({
+      id: "done",
+      isFinal: true,
+      actions: [action({ id: "filed", kind: "final" })],
+    }),
   ];
 }
 
@@ -422,6 +427,40 @@ describe("WorkflowGraph — التخطيط التلقائي", () => {
     const c = positions.find((p) => p.id === "c");
     expect(b?.y).toBe(c?.y);
     expect(Math.abs((b?.x ?? 0) - (c?.x ?? 0))).toBeGreaterThanOrEqual(208);
+  });
+
+  /**
+   * مرحلةٌ بلا زرّ حاسم كانت تمرّ: «المرحلة التالية» ترسم لها سهمًا فلا
+   * يرصدها `dead_end`. وهذا ما نشر مسارًا من أربع مراحل وقفت عليه معاملة.
+   */
+  it("يرصد مرحلةً بلا أزرار وإن كان لها مرحلة تالية", () => {
+    const issues = validateWorkflowGraph([
+      stage({ id: "a", isStart: true, defaultNextStageId: "b", actions: [] }),
+      stage({ id: "b", isFinal: true, actions: [action({ id: "f", kind: "final" })] }),
+    ]);
+    const bad = issues.find((i) => i.code === "no_decisive_action");
+    expect(bad?.stageId).toBe("a");
+    expect(bad?.detail).toContain("بلا أزرار");
+  });
+
+  it("ويرصد مرحلةً كل أزرارها ملاحظات", () => {
+    const issues = validateWorkflowGraph([
+      stage({
+        id: "a",
+        isStart: true,
+        defaultNextStageId: "b",
+        actions: [action({ id: "n", kind: "note" })],
+      }),
+      stage({ id: "b", isFinal: true, actions: [action({ id: "f", kind: "final" })] }),
+    ]);
+    expect(issues.find((i) => i.code === "no_decisive_action")?.detail).toContain(
+      "ملاحظة",
+    );
+  });
+
+  it("ولا يرصد مرحلةً فيها زرّ انتقال", () => {
+    const codes = validateWorkflowGraph(healthyStages()).map((i) => i.code);
+    expect(codes).not.toContain("no_decisive_action");
   });
 
   it("لوحةٌ لم تُرسم قطّ تُخطَّط كلّها بلا تراكب", () => {

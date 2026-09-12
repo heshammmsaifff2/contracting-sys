@@ -286,6 +286,10 @@ export function WorkflowAdminPage() {
    */
   const [expanded, setExpanded] = useState<Readonly<Record<string, boolean>>>({});
   const [isPipelineOpen, setIsPipelineOpen] = useState(false);
+  /** المسودّة المفتوحة في المنشئ للتعديل — null يعني بناءً جديدًا. */
+  const [pipelineDraft, setPipelineDraft] = useState<WorkflowDefinitionDto | null>(
+    null,
+  );
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -331,7 +335,10 @@ export function WorkflowAdminPage() {
             </Button>
 
             <Button
-              onClick={() => setIsPipelineOpen(true)}
+              onClick={() => {
+                setPipelineDraft(null);
+                setIsPipelineOpen(true);
+              }}
               startIcon={<Sparkles aria-hidden className="size-4" />}
             >
               {t.workflowAdmin.pipelineBuilder}
@@ -443,7 +450,10 @@ export function WorkflowAdminPage() {
                     }
                     size="sm"
                     onClick={() =>
-                      setViews((current) => ({ ...current, [definition.id]: "pipeline" }))
+                      setViews((current) => ({
+                        ...current,
+                        [definition.id]: "pipeline",
+                      }))
                     }
                     startIcon={<Sparkles aria-hidden className="size-4" />}
                   >
@@ -568,7 +578,27 @@ export function WorkflowAdminPage() {
                 {(views[definition.id] ?? "list") === "map" ? (
                   <WorkflowMapEditor definition={definition} />
                 ) : (views[definition.id] ?? "list") === "pipeline" ? (
-                  <WorkflowPipelineView definition={definition} />
+                  <div className="flex flex-col gap-3">
+                    {/* المسودّة تُعدَّل بنفس طريقة بنائها لا بنموذجٍ آخر */}
+                    {isDefinitionEditable(definition.status) && (
+                      <PermissionGate permission="workflow.manage">
+                        <span className="flex justify-end">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => {
+                              setPipelineDraft(definition);
+                              setIsPipelineOpen(true);
+                            }}
+                            startIcon={<Pencil aria-hidden className="size-4" />}
+                          >
+                            {t.workflowAdmin.editInBuilder}
+                          </Button>
+                        </span>
+                      </PermissionGate>
+                    )}
+                    <WorkflowPipelineView definition={definition} />
+                  </div>
                 ) : definition.stages.length === 0 ? (
                   <EmptyState title={t.workflowAdmin.noStages} />
                 ) : (
@@ -901,11 +931,17 @@ export function WorkflowAdminPage() {
 
       {isPipelineOpen && (
         <WorkflowPipelineBuilder
+          key={pipelineDraft?.id ?? "new"}
           isOpen={isPipelineOpen}
-          onClose={() => setIsPipelineOpen(false)}
-          onSuccess={(created) => {
+          definition={pipelineDraft}
+          onClose={() => {
+            setIsPipelineOpen(false);
+            setPipelineDraft(null);
+          }}
+          onSuccess={(saved) => {
             setMessage(t.workflowAdmin.pipelineSavedSuccess);
-            setExpanded((prev) => ({ ...prev, [created.id]: true }));
+            setExpanded((prev) => ({ ...prev, [saved.id]: true }));
+            setPipelineDraft(null);
           }}
         />
       )}

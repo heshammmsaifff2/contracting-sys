@@ -68,10 +68,7 @@ describe("SavePipelineWorkflow UseCase", () => {
     const res = await useCase.execute({
       name: "مسار سليم",
       transactionType: "valid_type",
-      stages: [
-        { name: "المرحلة الأولى" },
-        { name: "   " },
-      ],
+      stages: [{ name: "المرحلة الأولى" }, { name: "   " }],
     });
 
     expect(res.ok).toBe(false);
@@ -84,10 +81,7 @@ describe("SavePipelineWorkflow UseCase", () => {
     const res = await useCase.execute({
       name: "مسار مراجعة معتمد",
       transactionType: "correspondence_review",
-      stages: [
-        { name: "إعداد المراسلة" },
-        { name: "اعتماد مدير المشروع" },
-      ],
+      stages: [{ name: "إعداد المراسلة" }, { name: "اعتماد مدير المشروع" }],
     });
 
     expect(res.ok).toBe(true);
@@ -99,7 +93,11 @@ describe("SavePipelineWorkflow UseCase", () => {
       name: "مسار تكراري",
       transactionType: "self_loop",
       stages: [
-        { name: "المرحلة الأولى", stageKey: "start_stage", targetStageKeys: ["start_stage"] },
+        {
+          name: "المرحلة الأولى",
+          stageKey: "start_stage",
+          targetStageKeys: ["start_stage"],
+        },
       ],
     });
 
@@ -114,7 +112,11 @@ describe("SavePipelineWorkflow UseCase", () => {
       name: "مسار بوجهة وهمية",
       transactionType: "unknown_target",
       stages: [
-        { name: "المرحلة الأولى", stageKey: "start_stage", targetStageKeys: ["non_existent"] },
+        {
+          name: "المرحلة الأولى",
+          stageKey: "start_stage",
+          targetStageKeys: ["non_existent"],
+        },
       ],
     });
 
@@ -129,7 +131,11 @@ describe("SavePipelineWorkflow UseCase", () => {
       name: "مسار متفرع توازي",
       transactionType: "fork_workflow",
       stages: [
-        { name: "البداية", stageKey: "start", targetStageKeys: ["branch_a", "branch_b"] },
+        {
+          name: "البداية",
+          stageKey: "start",
+          targetStageKeys: ["branch_a", "branch_b"],
+        },
         { name: "الفرع أ", stageKey: "branch_a", targetStageKeys: ["archive"] },
         { name: "الفرع ب", stageKey: "branch_b", targetStageKeys: ["archive"] },
         { name: "الأرشفة", stageKey: "archive", joinPolicy: "wait_all" },
@@ -160,7 +166,9 @@ describe("SavePipelineWorkflow UseCase", () => {
 
     expect(res.ok).toBe(false);
     if (!res.ok) {
-      expect(res.error.message).toContain("اسم الإجراء رقم 1 في المرحلة «المرحلة الأولى» مطلوب");
+      expect(res.error.message).toContain(
+        "اسم الإجراء رقم 1 في المرحلة «المرحلة الأولى» مطلوب",
+      );
     }
   });
 

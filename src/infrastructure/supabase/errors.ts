@@ -66,16 +66,18 @@ export function toDomainDbError(
       let msg = "القيمة مستخدَمة من قبل — الكود يجب أن يكون فريدًا";
       const fullMsg = `${error.message ?? ""} ${error.details ?? ""}`;
       if (fullMsg.includes("workflow_definitions_type_version_idx")) {
-        msg = "رمز نوع المعاملة مستخدم بالفعل في مسار آخر — يجب أن يكون رمز نوع المعاملة فريدًا";
+        msg =
+          "رمز نوع المعاملة مستخدم بالفعل في مسار آخر — يجب أن يكون رمز نوع المعاملة فريدًا";
       } else if (fullMsg.includes("workflow_stages_definition_id_stage_key_key")) {
-        msg = "رمز المرحلة مكرر داخل هذا المسار — يجب أن يكون لكل مرحلة رمز إنجليزي فريد";
+        msg =
+          "رمز المرحلة مكرر داخل هذا المسار — يجب أن يكون لكل مرحلة رمز إنجليزي فريد";
       } else if (fullMsg.includes("workflow_definitions_one_published_idx")) {
         msg = "يوجد مسار منشور ومفعّل بالفعل لهذا النوع من المعاملات";
       }
-      return new ConflictError(
-        spoken(error, msg),
-        { entity: context.entity, cause: error.details },
-      );
+      return new ConflictError(spoken(error, msg), {
+        entity: context.entity,
+        cause: error.details,
+      });
     }
     // foreign_key_violation
     case "23503":
@@ -88,7 +90,8 @@ export function toDomainDbError(
       let checkMsg = "قيمة غير مقبولة حسب قواعد قاعدة البيانات";
       const full = `${error.message ?? ""} ${error.details ?? ""}`;
       if (full.includes("participant_shape")) {
-        checkMsg = "بيانات المشارك غير مكتملة — يجب اختيار الدور أو الموظف المطلوب للمشارك";
+        checkMsg =
+          "بيانات المشارك غير مكتملة — يجب اختيار الدور أو الموظف المطلوب للمشارك";
       } else if (full.includes("workflow_definitions_active_only_published")) {
         checkMsg = "لا يمكن تفعيل مسار غير منشور";
       }

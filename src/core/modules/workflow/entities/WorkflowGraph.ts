@@ -134,6 +134,7 @@ export type GraphIssueCode =
   | "no_final"
   | "unreachable"
   | "dead_end"
+  | "no_decisive_action"
   | "action_without_route"
   | "route_to_missing"
   | "no_participants"
@@ -158,6 +159,7 @@ const SEVERITY: Record<GraphIssueCode, GraphSeverity> = {
   no_final: "error",
   unreachable: "warning",
   dead_end: "error",
+  no_decisive_action: "error",
   action_without_route: "error",
   route_to_missing: "error",
   no_participants: "error",
@@ -382,6 +384,24 @@ export function validateWorkflowGraph(
           );
         }
       }
+    }
+
+    /**
+     * زرٌّ يحسم، وإلّا وقفت المعاملة.
+     *
+     * «المرحلة التالية» مخرجٌ في المحرّك لا في الشاشة: `ActionButtons` لا
+     * تعرض شيئًا حين لا أزرار، فلا يجد المكلَّف ما يضغطه ليبلغها. ولذلك
+     * تُرصَد المرحلة التي لا زرّ حاسم فيها **وإن كان لها احتياطيّ** —
+     * وسهمُ الاحتياطيّ على اللوحة كان يُخفي العيب لا يُصلحه.
+     */
+    if (!stage.actions.some((action) => action.kind !== "note")) {
+      add(
+        "no_decisive_action",
+        stage,
+        stage.actions.length === 0
+          ? "مرحلة بلا أزرار — المكلَّف لا يجد ما يضغطه فتقف المعاملة"
+          : "كل أزرار المرحلة ملاحظات — والملاحظة لا تحرّك المعاملة",
+      );
     }
 
     if (!stageCloses(stage) && (outDegree.get(stage.id) ?? 0) === 0) {

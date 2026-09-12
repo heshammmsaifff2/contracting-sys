@@ -456,23 +456,89 @@ export class SupabaseWorkflowDefinitionRepository implements IWorkflowDefinition
     }
 
     try {
-      // 1. إنشاء تعريف المسار
-      const { data: defData, error: defError } = await this.client
+      /**
+       * نوعٌ له مسار بالفعل يعني **إصدارًا تاليًا** لا رفضًا.
+       *
+       * كان الإدراج يمضي بالإصدار ١ دائمًا، فيصطدم بالفهرس الفريد
+       * (نوع المعاملة، الإصدار) ويُردّ المستخدم بعد أن بنى المسار كلّه.
+       * والنظام كلّه قائم على الإصدارات: المنشور يتقاعد عند نشر تاليه،
+       * ومعاملاته تكمل عليه. فيُقرأ آخر إصدار ويُبنى ما بعده، وتُورَّث
+       * السلالة ليبقى الجميع إصداراتِ مسارٍ واحد لا مساراتٍ متفرّقة.
+       */
+      const trimmedType = input.transactionType.trim();
+      const { data: siblings, error: siblingErr } = await this.client
         .from("workflow_definitions")
-        .insert({
-          transaction_type: input.transactionType.trim(),
-          name: input.name.trim(),
-          is_active: input.isActive ?? true,
-        })
-        .select("id")
-        .single();
+        .select("version, lineage_id")
+        .eq("transaction_type", trimmedType)
+        .order("version", { ascending: false })
+        .limit(1);
 
-      if (defError) return err(toDomainDbError(defError, { entity: "مسار سير العمل" }));
-      const definitionId = defData.id;
+      if (siblingErr) {
+        return err(toDomainDbError(siblingErr, { entity: "مسار سير العمل" }));
+      }
 
+      const previous = siblings?.[0] ?? null;
+      const nextVersion = (previous?.version ?? 0) + 1;
+
+      /**
+       * تعديل مسودّةٍ قائمة: تُفرَّغ مراحلها ثم تُبنى من جديد.
+       *
+       * وليس تحديثًا حقلًا حقلًا: المنشئ يُسلّم صورةً كاملة للمسار، ومطابقةُ
+       * ما تغيّر مرحلةً مرحلةً وزرًّا زرًّا تُضاعف الشيفرة وتتباعد عن البناء.
+       * وحذف المرحلة يجرّ مشاركيها وأزرارها ووجهاتها (`cascade`)، فالتفريغ
+       * سطرٌ واحد. والمسودّة وحدها تُفرَّغ — والمنشور يحرسه المُشغّل المجمِّد.
+       */
+      const isEditingDraft =
+        input.definitionId !== undefined && input.definitionId !== null;
+      let definitionId: string;
+
+      if (isEditingDraft) {
+        definitionId = input.definitionId as string;
+
+        const { error: renameErr } = await this.client
+          .from("workflow_definitions")
+          .update({ name: input.name.trim() })
+          .eq("id", definitionId)
+          .eq("status", "draft");
+        if (renameErr) {
+          return err(toDomainDbError(renameErr, { entity: "مسار سير العمل" }));
+        }
+
+        const { error: clearErr } = await this.client
+          .from("workflow_stages")
+          .delete()
+          .eq("definition_id", definitionId);
+        if (clearErr) {
+          return err(toDomainDbError(clearErr, { entity: "مراحل المسودّة" }));
+        }
+      } else {
+        // 1. إنشاء تعريف المسار
+        const { data: defData, error: defError } = await this.client
+          .from("workflow_definitions")
+          .insert({
+            transaction_type: trimmedType,
+            name: input.name.trim(),
+            is_active: input.isActive ?? true,
+            version: nextVersion,
+            ...(previous?.lineage_id ? { lineage_id: previous.lineage_id } : {}),
+          })
+          .select("id")
+          .single();
+
+        if (defError) {
+          return err(toDomainDbError(defError, { entity: "مسار سير العمل" }));
+        }
+        definitionId = defData.id;
+      }
+
+      // التراجع يمحو ما أُنشئ، ولا يمحو مسودّةً كانت قائمة قبل التعديل
       const rollback = async () => {
+        if (isEditingDraft) return;
         try {
-          await this.client.from("workflow_definitions").delete().eq("id", definitionId);
+          await this.client
+            .from("workflow_definitions")
+            .delete()
+            .eq("id", definitionId);
         } catch {
           // ignore rollback errors
         }
@@ -502,7 +568,12 @@ export class SupabaseWorkflowDefinitionRepository implements IWorkflowDefinition
             quorum_count: s.quorumCount ?? null,
             is_start: isStart,
             is_final: isFinal,
-            is_archive: isFinal ? (s.isArchive ?? true) : false,
+            /**
+             * `?? true` لا يعمل: الباني يُرسل `false` صريحًا لا فراغًا، فلا
+             * يقع الافتراض أبدًا. والاختيار صار خانةً ظاهرة في الباني،
+             * فيُحترَم ما اختاره المؤلِّف ولا يُفترَض عنه.
+             */
+            is_archive: s.isArchive ?? false,
             is_program_manager: s.isProgramManager ?? false,
             requires_receive: s.requiresReceive ?? false,
             sla_minutes: s.slaMinutes ?? null,
@@ -661,7 +732,9 @@ export class SupabaseWorkflowDefinitionRepository implements IWorkflowDefinition
               .from("workflow_actions")
               .insert({
                 stage_id: currentStageId,
-                action_key: (act.actionKey || `action_${aIdx + 1}`).trim().toLowerCase(),
+                action_key: (act.actionKey || `action_${aIdx + 1}`)
+                  .trim()
+                  .toLowerCase(),
                 label: act.label.trim(),
                 kind: act.kind,
                 sort_order: act.sortOrder ?? aIdx + 1,
@@ -757,7 +830,9 @@ export class SupabaseWorkflowDefinitionRepository implements IWorkflowDefinition
 
               if (routeErr) {
                 await rollback();
-                return err(toDomainDbError(routeErr, { entity: "مسار الإجراء للأمام" }));
+                return err(
+                  toDomainDbError(routeErr, { entity: "مسار الإجراء للأمام" }),
+                );
               }
             }
           } else {
@@ -819,25 +894,25 @@ export class SupabaseWorkflowDefinitionRepository implements IWorkflowDefinition
 
               if (bwdRouteErr) {
                 await rollback();
-                return err(toDomainDbError(bwdRouteErr, { entity: "مسار الإجراء للخلف" }));
+                return err(
+                  toDomainDbError(bwdRouteErr, { entity: "مسار الإجراء للخلف" }),
+                );
               }
             }
           }
 
           // زر الملاحظة
-          const { error: noteErr } = await this.client
-            .from("workflow_actions")
-            .insert({
-              stage_id: currentStageId,
-              action_key: "note",
-              label: "إضافة ملاحظة",
-              kind: "note",
-              sort_order: 3,
-              requires_note: true,
-              requires_attachment: false,
-              requires_evaluation: false,
-              return_minutes: null,
-            });
+          const { error: noteErr } = await this.client.from("workflow_actions").insert({
+            stage_id: currentStageId,
+            action_key: "note",
+            label: "إضافة ملاحظة",
+            kind: "note",
+            sort_order: 3,
+            requires_note: true,
+            requires_attachment: false,
+            requires_evaluation: false,
+            return_minutes: null,
+          });
 
           if (noteErr) {
             await rollback();
@@ -859,11 +934,16 @@ export class SupabaseWorkflowDefinitionRepository implements IWorkflowDefinition
         return err(toDomainDbError(fetchErr, { entity: "مسار سير العمل" }));
       }
 
-      // 7. نشر المسار فوراً إن طُلِب ذلك
+      /**
+       * 7. النشر — وفشلُه **لا يمحو ما بُني**.
+       *
+       * كان الفشل يستدعي التراجع فيُمسح المسار كلّه. وأخطاء النشر قابلة
+       * للإصلاح كلّها («مرحلة بلا مشاركين»، «زرّ بلا وجهة»)، فمحوُ عشر
+       * دقائق من البناء عقوبةٌ على خطأ مطبعيّ. تبقى مسودّةً تُصلَح وتُنشَر.
+       */
       if (input.autoPublish) {
         const pubResult = await this.publishVersion(definitionId);
         if (!pubResult.ok) {
-          await rollback();
           return err(pubResult.error);
         }
         const { data: publishedDef, error: pubFetchErr } = await this.client

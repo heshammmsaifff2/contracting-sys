@@ -504,6 +504,11 @@ export interface PipelineStageInput {
 }
 
 export interface SavePipelineWorkflowDto {
+  /**
+   * مسودّةٌ قائمة تُعاد كتابتها بدل إنشاء مسار جديد.
+   * المنشور والمتقاعد لا يُعدَّلان — يُنشأ منهما إصدارٌ تالٍ.
+   */
+  readonly definitionId?: string;
   readonly name: string;
   readonly transactionType: string;
   readonly isActive?: boolean;

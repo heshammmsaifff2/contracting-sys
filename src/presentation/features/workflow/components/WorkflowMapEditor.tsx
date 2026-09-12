@@ -80,6 +80,7 @@ const ISSUE_LABELS: Record<GraphIssue["code"], string> = {
   no_final: t.workflowMap.issueNoFinal,
   unreachable: t.workflowMap.issueUnreachable,
   dead_end: t.workflowMap.issueDeadEnd,
+  no_decisive_action: t.workflowMap.issueNoDecisiveAction,
   action_without_route: t.workflowMap.issueActionWithoutRoute,
   route_to_missing: t.workflowMap.issueRouteToMissing,
   no_participants: t.workflowMap.issueNoParticipants,
@@ -149,8 +150,20 @@ function StageInspector({
         <span className="text-content-muted font-mono text-[11px]">
           {stage.stageKey}
         </span>
+        {/* اللوحة كانت تُخفي ما تُظهره القائمة: الأرشفة والاستلام والسياسة */}
         {stage.isStart && <Badge tone="success">{t.workflowAdmin.isStart}</Badge>}
         {stage.isFinal && <Badge tone="info">{t.workflowAdmin.isFinal}</Badge>}
+        {stage.isArchive && <Badge tone="brand">{t.workflowAdmin.isArchive}</Badge>}
+        {stage.requiresReceive && (
+          <Badge tone="neutral">{t.workflowAdmin.requiresReceive}</Badge>
+        )}
+        {stage.completionPolicy !== "all" && (
+          <Badge tone="neutral">
+            {stage.completionPolicy === "any"
+              ? t.workflowAdmin.policyAny
+              : `${t.workflowAdmin.policyQuorum} (${stage.quorumCount ?? 0})`}
+          </Badge>
+        )}
         {stage.slaMinutes !== null && (
           <span className="text-content-muted text-[11px]">
             {t.inbox.allocated}: {formatDuration(stage.slaMinutes)}

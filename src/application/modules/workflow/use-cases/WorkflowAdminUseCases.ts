@@ -177,7 +177,9 @@ export class SavePipelineWorkflow implements UseCase<
 
     // التحقق من صحة الوجهات المستهدفة (targetStageKeys) إن وُجدت
     const allStageKeys = new Set(
-      input.stages.map((s, idx) => (s.stageKey?.trim() || `stage_${idx + 1}`).toLowerCase()),
+      input.stages.map((s, idx) =>
+        (s.stageKey?.trim() || `stage_${idx + 1}`).toLowerCase(),
+      ),
     );
     for (let i = 0; i < input.stages.length; i++) {
       const s = input.stages[i];
@@ -188,10 +190,9 @@ export class SavePipelineWorkflow implements UseCase<
           const tKey = target.trim().toLowerCase();
           if (tKey === currentKey) {
             return err(
-              new ValidationError(
-                `المرحلة «${s.name}» لا يمكن أن توجّه إلى نفسها`,
-                { [`stages.${i}.targetStageKeys`]: "self_reference" },
-              ),
+              new ValidationError(`المرحلة «${s.name}» لا يمكن أن توجّه إلى نفسها`, {
+                [`stages.${i}.targetStageKeys`]: "self_reference",
+              }),
             );
           }
           if (!allStageKeys.has(tKey)) {
@@ -221,10 +222,9 @@ export class SavePipelineWorkflow implements UseCase<
           const aKey = (action.actionKey || `action_${aIdx + 1}`).trim().toLowerCase();
           if (actionKeys.has(aKey)) {
             return err(
-              new ValidationError(
-                `رمز الإجراء «${aKey}» مكرر في المرحلة «${s.name}»`,
-                { [`stages.${i}.actions.${aIdx}.actionKey`]: "duplicate" },
-              ),
+              new ValidationError(`رمز الإجراء «${aKey}» مكرر في المرحلة «${s.name}»`, {
+                [`stages.${i}.actions.${aIdx}.actionKey`]: "duplicate",
+              }),
             );
           }
           actionKeys.add(aKey);

@@ -6,10 +6,7 @@ import type { WorkflowDefinitionDto } from "@application/modules/workflow/dtos";
 import { Badge } from "@presentation/shared/ui/Badge";
 import { EmptyState } from "@presentation/shared/ui/EmptyState";
 import { formatDuration } from "@presentation/shared/lib/formatters";
-import {
-  ACTION_KIND_TONES,
-  participantLabel,
-} from "./workflow-admin-options";
+import { ACTION_KIND_TONES, participantLabel } from "./workflow-admin-options";
 import { t } from "@i18n/index";
 
 export function WorkflowPipelineView({
@@ -25,8 +22,16 @@ export function WorkflowPipelineView({
     <div className="flex flex-col gap-3" dir="rtl">
       <div className="bg-surface-sunken/40 border-border flex items-stretch gap-4 overflow-x-auto rounded-xl border p-4">
         {definition.stages.map((stage, idx) => {
-          const isFirst = idx === 0;
-          const isLast = idx === definition.stages.length - 1;
+          /**
+           * العلامة تُقرأ من المرحلة لا من موضعها.
+           *
+           * كان العرض يقول «نهاية وأرشفة» لآخر بطاقة مهما كانت أعلامها،
+           * فيتناقض مع القائمة واللوحة اللتين تقرآن `isArchive` الحقيقيّ —
+           * ويظنّ القارئ أن مسارَه يؤرشف وهو لا يؤرشف.
+           */
+          const isFirst = stage.isStart || idx === 0;
+          // السهم يخصّ ترتيب العرض وحده، فيبقى على الموضع
+          const isLastCard = idx === definition.stages.length - 1;
 
           return (
             <div key={stage.id} className="flex shrink-0 items-center gap-3">
@@ -37,18 +42,23 @@ export function WorkflowPipelineView({
                     <span className="bg-primary/10 text-primary flex size-6 items-center justify-center rounded-full text-xs font-bold">
                       {idx + 1}
                     </span>
-                    <span className="text-content text-sm font-bold truncate">
+                    <span className="text-content truncate text-sm font-bold">
                       {stage.name}
                     </span>
                   </div>
 
-                  <Badge tone={isFirst ? "info" : isLast ? "success" : "neutral"}>
-                    {isFirst
-                      ? "بداية"
-                      : isLast
-                        ? "نهاية وأرشفة"
-                        : "مراجعة"}
-                  </Badge>
+                  <span className="flex shrink-0 flex-wrap justify-end gap-1">
+                    {isFirst && <Badge tone="info">{t.workflowAdmin.isStart}</Badge>}
+                    {stage.isFinal && (
+                      <Badge tone="success">{t.workflowAdmin.isFinal}</Badge>
+                    )}
+                    {stage.isArchive && (
+                      <Badge tone="brand">{t.workflowAdmin.isArchive}</Badge>
+                    )}
+                    {!isFirst && !stage.isFinal && !stage.isArchive && (
+                      <Badge tone="neutral">{t.workflowAdmin.stageReview}</Badge>
+                    )}
+                  </span>
                 </div>
 
                 <div className="text-content-muted font-mono text-[11px]">
@@ -113,7 +123,7 @@ export function WorkflowPipelineView({
               </div>
 
               {/* سهم الربط بين المراحل */}
-              {!isLast && (
+              {!isLastCard && (
                 <div className="text-primary/70 flex shrink-0 items-center justify-center">
                   <ArrowLeft className="size-5 animate-pulse" />
                 </div>
