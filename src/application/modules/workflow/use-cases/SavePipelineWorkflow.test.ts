@@ -138,4 +138,133 @@ describe("SavePipelineWorkflow UseCase", () => {
 
     expect(res.ok).toBe(true);
   });
+
+  it("fails if custom action has empty label", async () => {
+    const res = await useCase.execute({
+      name: "مسار بإجراء بلا اسم",
+      transactionType: "no_label",
+      stages: [
+        {
+          name: "المرحلة الأولى",
+          stageKey: "s1",
+          actions: [
+            {
+              actionKey: "act1",
+              label: "   ",
+              kind: "forward",
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.error.message).toContain("اسم الإجراء رقم 1 في المرحلة «المرحلة الأولى» مطلوب");
+    }
+  });
+
+  it("fails if custom action assigns returnMinutes to a non-backward action", async () => {
+    const res = await useCase.execute({
+      name: "مسار غير سليم",
+      transactionType: "bad_action",
+      stages: [
+        {
+          name: "المرحلة الأولى",
+          stageKey: "s1",
+          actions: [
+            {
+              actionKey: "act_forward",
+              label: "اعتماد",
+              kind: "forward",
+              returnMinutes: 60,
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.error.message).toContain("مدّة الإعادة تخصّ إجراء الإرجاع وحده");
+    }
+  });
+
+  it("fails if custom action route targets an unknown stage key", async () => {
+    const res = await useCase.execute({
+      name: "مسار بوجهة مجهولة للإجراء",
+      transactionType: "unknown_route",
+      stages: [
+        {
+          name: "المرحلة الأولى",
+          stageKey: "s1",
+          actions: [
+            {
+              actionKey: "act1",
+              label: "اعتماد",
+              kind: "forward",
+              routes: [{ targetStageKey: "non_existent_stage" }],
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.error.message).toContain("غير موجودة في هذا المسار");
+    }
+  });
+
+  it("successfully passes validation with custom actions, conditions, and deadlines", async () => {
+    const res = await useCase.execute({
+      name: "مسار متكامل شامل",
+      transactionType: "full_workflow",
+      autoPublish: true,
+      stages: [
+        {
+          name: "المرحلة الأولى",
+          stageKey: "s1",
+          slaMinutes: 120,
+          deadlineSpec: { time: "14:00", days: [4] },
+          deadlineAction: "notify",
+          requirements: [
+            {
+              kind: "condition",
+              condition: { op: "gt", field: "amount", value: 1000 },
+              message: "المبلغ يجب أن يكون أكبر من 1000",
+            },
+          ],
+          actions: [
+            {
+              actionKey: "approve_high",
+              label: "اعتماد المبالغ الكبيرة",
+              kind: "forward",
+              routes: [
+                {
+                  targetStageKey: "s2",
+                  priority: 10,
+                  condition: { op: "gt", field: "amount", value: 50000 },
+                },
+              ],
+            },
+            {
+              actionKey: "reject_fix",
+              label: "إرجاع للتصحيح",
+              kind: "backward",
+              returnMinutes: 30,
+              requiresNote: true,
+            },
+          ],
+        },
+        {
+          name: "المرحلة الثانية",
+          stageKey: "s2",
+          isArchive: true,
+        },
+      ],
+    });
+
+    expect(res.ok).toBe(true);
+  });
 });

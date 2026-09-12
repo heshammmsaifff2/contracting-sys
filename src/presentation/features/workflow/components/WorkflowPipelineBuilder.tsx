@@ -14,32 +14,39 @@ import { useState, type DragEvent } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ChevronUp,
   Clock,
+  CornerDownLeft,
   FileCheck,
   FolderPlus,
   GitFork,
   GripVertical,
   Layers,
-  Paperclip,
   Plus,
+  Route,
   Sliders,
   Sparkles,
   Trash2,
-  Undo2,
   UserPlus,
   Users,
 } from "lucide-react";
+import type { ActionKind } from "@core/modules/workflow/entities/WorkflowAction";
+import type { ConditionOp, WorkflowCondition } from "@core/modules/workflow/entities/WorkflowCondition";
 import type { CompletionPolicy } from "@core/modules/workflow/entities/StageInstance";
 import type { ClaimPolicy } from "@core/modules/workflow/entities/WorkflowGovernance";
 import type {
+  DeadlineAction,
   JoinPolicy,
   ParticipantKind,
+  PipelineStageInput,
+  RequirementScope,
   WorkflowDefinitionDto,
 } from "@application/modules/workflow/dtos";
+import {
+  StageAdvancedConfigModal,
+  StageCustomActionsModal,
+} from "./WorkflowPipelineStageModals";
 import { Badge } from "@presentation/shared/ui/Badge";
 import { Button } from "@presentation/shared/ui/Button";
 import { FormField } from "@presentation/shared/ui/FormField";
@@ -65,6 +72,39 @@ export interface StageParticipantItem {
   requiresSign: boolean;
   isOptional: boolean;
   isObserver: boolean;
+}
+
+export interface StageRouteItem {
+  id: string;
+  targetStageKey: string;
+  priority: number;
+  hasCondition: boolean;
+  field: string;
+  op: ConditionOp;
+  value: string;
+}
+
+export interface StageActionItem {
+  id: string;
+  actionKey: string;
+  label: string;
+  kind: ActionKind;
+  sortOrder: number;
+  requiresNote: boolean;
+  requiresAttachment: boolean;
+  requiresEvaluation: boolean;
+  returnHours: number;
+  returnMinutes: number;
+  routes: StageRouteItem[];
+}
+
+export interface StageConditionItem {
+  id: string;
+  field: string;
+  op: ConditionOp;
+  value: string;
+  message: string;
+  appliesTo: RequirementScope;
 }
 
 export interface PipelineStageItem {
@@ -95,6 +135,18 @@ export interface PipelineStageItem {
   // التوجيه والتشعيب
   targetMode: "auto" | "custom";
   customTargets: string[];
+
+  // ── الميزات المتقدمة الجديدة ──
+  // تخصيص الأزرار
+  customActionsEnabled: boolean;
+  actions: StageActionItem[];
+  // شروط الجاهزية المنطقية
+  conditions: StageConditionItem[];
+  // الموعد الأسبوعي الثابت للإقفال
+  hasDeadline: boolean;
+  deadlineTime: string;
+  deadlineDays: number[];
+  deadlineAction: DeadlineAction;
 }
 
 interface PresetTemplate {
@@ -266,6 +318,136 @@ const PRESETS: readonly PresetTemplate[] = [
   },
 ];
 
+export function buildConditionFromItem(item: {
+  field: string;
+  op: ConditionOp;
+  value: string;
+}): WorkflowCondition | null {
+  const { field, op, value } = item;
+  if (!field || field.trim() === "") return null;
+  const needsValue = op !== "is_null" && op !== "is_not_null";
+  if (!needsValue) {
+    return { op: op as "is_null" | "is_not_null", field: field.trim() };
+  }
+  const isList = op === "in" || op === "not_in";
+  if (isList) {
+    const listValues = value
+      .split(",")
+      .map((part) => part.trim())
+      .filter((part) => part !== "")
+      .map((part) => (Number.isNaN(Number(part)) ? part : Number(part)));
+    return { op: op as "in" | "not_in", field: field.trim(), value: listValues };
+  }
+  const parsedNum = Number(value);
+  const finalVal =
+    value.trim() !== "" && !Number.isNaN(parsedNum) ? parsedNum : value.trim();
+  return {
+    op: op as "eq" | "ne" | "gt" | "gte" | "lt" | "lte",
+    field: field.trim(),
+    value: finalVal,
+  };
+}
+
+export function createDefaultActionsForStage(
+  stageIndex: number,
+  totalStages: number,
+  allStages: PipelineStageItem[],
+): StageActionItem[] {
+  const isFinal = stageIndex === totalStages - 1;
+  const actions: StageActionItem[] = [];
+
+  // 1. زر التقدم أو الإغلاق
+  if (!isFinal) {
+    const nextStage = allStages[stageIndex + 1];
+    actions.push({
+      id: `act_${Date.now()}_fwd`,
+      actionKey: "forward",
+      label: "اعتماد وإرسال",
+      kind: "forward",
+      sortOrder: 1,
+      requiresNote: false,
+      requiresAttachment: false,
+      requiresEvaluation: false,
+      returnHours: 0,
+      returnMinutes: 0,
+      routes: nextStage
+        ? [
+            {
+              id: `rt_${Date.now()}_fwd`,
+              targetStageKey: nextStage.stageKey,
+              priority: 1,
+              hasCondition: false,
+              field: "amount",
+              op: "gt",
+              value: "",
+            },
+          ]
+        : [],
+    });
+  } else {
+    actions.push({
+      id: `act_${Date.now()}_arch`,
+      actionKey: "archive",
+      label: "إغلاق وأرشفة",
+      kind: "final",
+      sortOrder: 1,
+      requiresNote: false,
+      requiresAttachment: false,
+      requiresEvaluation: false,
+      returnHours: 0,
+      returnMinutes: 0,
+      routes: [],
+    });
+  }
+
+  // 2. زر الإرجاع للمراحل بعد الأولى
+  if (stageIndex > 0) {
+    const prevStage = allStages[stageIndex - 1];
+    actions.push({
+      id: `act_${Date.now()}_bwd`,
+      actionKey: "backward",
+      label: isFinal ? "إرجاع للمراجعة" : "إرجاع / رفض",
+      kind: "backward",
+      sortOrder: 2,
+      requiresNote: true,
+      requiresAttachment: false,
+      requiresEvaluation: false,
+      returnHours: 0,
+      returnMinutes: 0,
+      routes: prevStage
+        ? [
+            {
+              id: `rt_${Date.now()}_bwd`,
+              targetStageKey: prevStage.stageKey,
+              priority: 1,
+              hasCondition: false,
+              field: "amount",
+              op: "gt",
+              value: "",
+            },
+          ]
+        : [],
+    });
+  }
+
+  // 3. زر الملاحظة
+  actions.push({
+    id: `act_${Date.now()}_note`,
+    actionKey: "note",
+    label: "إضافة ملاحظة",
+    kind: "note",
+    sortOrder: 3,
+    requiresNote: true,
+    requiresAttachment: false,
+    requiresEvaluation: false,
+    returnHours: 0,
+    returnMinutes: 0,
+    routes: [],
+  });
+
+  return actions;
+}
+
 function createEmptyStage(index: number, defaultRoleId = ""): PipelineStageItem {
   return {
     id: `stage_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
@@ -299,6 +481,13 @@ function createEmptyStage(index: number, defaultRoleId = ""): PipelineStageItem 
     showAdvanced: false,
     targetMode: "auto",
     customTargets: [],
+    customActionsEnabled: false,
+    actions: [],
+    conditions: [],
+    hasDeadline: false,
+    deadlineTime: "14:00",
+    deadlineDays: [4],
+    deadlineAction: "notify",
   };
 }
 
@@ -319,6 +508,7 @@ export function WorkflowPipelineBuilder({
   const [name, setName] = useState("مسار مراسلات ومخاطبات جديد");
   const [transactionType, setTransactionType] = useState("correspondence_new");
   const [autoWireActions, setAutoWireActions] = useState(true);
+  const [autoPublish, setAutoPublish] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [stages, setStages] = useState<PipelineStageItem[]>([
@@ -354,6 +544,13 @@ export function WorkflowPipelineBuilder({
       showAdvanced: false,
       targetMode: "auto",
       customTargets: [],
+      customActionsEnabled: false,
+      actions: [],
+      conditions: [],
+      hasDeadline: false,
+      deadlineTime: "14:00",
+      deadlineDays: [4],
+      deadlineAction: "notify",
     },
     {
       id: "s_2",
@@ -387,6 +584,13 @@ export function WorkflowPipelineBuilder({
       showAdvanced: false,
       targetMode: "auto",
       customTargets: [],
+      customActionsEnabled: false,
+      actions: [],
+      conditions: [],
+      hasDeadline: false,
+      deadlineTime: "14:00",
+      deadlineDays: [4],
+      deadlineAction: "notify",
     },
     {
       id: "s_3",
@@ -420,6 +624,13 @@ export function WorkflowPipelineBuilder({
       showAdvanced: false,
       targetMode: "auto",
       customTargets: [],
+      customActionsEnabled: false,
+      actions: [],
+      conditions: [],
+      hasDeadline: false,
+      deadlineTime: "14:00",
+      deadlineDays: [4],
+      deadlineAction: "notify",
     },
   ]);
 
@@ -443,6 +654,10 @@ export function WorkflowPipelineBuilder({
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [dragEnabledIndex, setDragEnabledIndex] = useState<number | null>(null);
+
+  // المودالات المنبثقة للسياسات وتخصيص الأزرار
+  const [editingPoliciesIndex, setEditingPoliciesIndex] = useState<number | null>(null);
+  const [editingActionsIndex, setEditingActionsIndex] = useState<number | null>(null);
 
   function applyPreset(preset: PresetTemplate) {
     const pmId =
@@ -503,6 +718,13 @@ export function WorkflowPipelineBuilder({
         showAdvanced: false,
         targetMode: "auto",
         customTargets: [],
+        customActionsEnabled: false,
+        actions: [],
+        conditions: [],
+        hasDeadline: false,
+        deadlineTime: "",
+        deadlineDays: [],
+        deadlineAction: "notify",
       })),
     );
   }
@@ -702,6 +924,10 @@ export function WorkflowPipelineBuilder({
         );
         return;
       }
+      if (s.hasDeadline && s.deadlineDays.length === 0) {
+        setError(`المرحلة «${s.name}» مفعّل بها موعد أسبوعي، يرجى تحديد يوم واحد على الأقل.`);
+        return;
+      }
     }
 
     try {
@@ -709,6 +935,7 @@ export function WorkflowPipelineBuilder({
         name: name.trim(),
         transactionType: cleanType,
         isActive: true,
+        autoPublish,
         autoWireActions,
         stages: stages.map((s, idx) => {
           // حساب إجمالي الدقائق للـ SLA
@@ -719,10 +946,66 @@ export function WorkflowPipelineBuilder({
           const isCustomRouting =
             s.targetMode === "custom" && s.customTargets && s.customTargets.length > 0;
 
-          return {
+          // تجهيز شروط الجاهزية (مرفقات + شروط منطقية)
+          const requirements = [];
+          if (s.requiresAttachment) {
+            requirements.push({
+              kind: "attachment" as const,
+              minAttachments: s.minAttachments || 1,
+              message: s.attachmentMessage || "يرجى إرفاق المستند قبل الاعتماد",
+              appliesTo: "advancing" as const,
+            });
+          }
+          if (s.conditions && s.conditions.length > 0) {
+            for (const cond of s.conditions) {
+              const parsedCond = buildConditionFromItem(cond);
+              if (parsedCond) {
+                requirements.push({
+                  kind: "condition" as const,
+                  condition: parsedCond,
+                  message: cond.message || "البيانات غير مكتملة لتحقيق هذا الشرط",
+                  appliesTo: cond.appliesTo || "advancing",
+                });
+              }
+            }
+          }
+
+          // تجهيز الأزرار المخصصة إن تم تفعيلها
+          const actions =
+            s.customActionsEnabled && s.actions.length > 0
+              ? s.actions.map((act, aIdx) => {
+                  const actTotalReturn = (act.returnHours * 60) + act.returnMinutes;
+                  return {
+                    actionKey: (act.actionKey || `action_${aIdx + 1}`).trim().toLowerCase(),
+                    label: act.label.trim(),
+                    kind: act.kind,
+                    sortOrder: act.sortOrder || aIdx + 1,
+                    requiresNote: act.requiresNote,
+                    requiresAttachment: act.requiresAttachment,
+                    requiresEvaluation: act.requiresEvaluation,
+                    returnMinutes: actTotalReturn > 0 ? actTotalReturn : null,
+                    routes: act.routes.map((r, rIdx) => ({
+                      targetStageKey: r.targetStageKey.trim().toLowerCase(),
+                      priority: r.priority || (rIdx + 1) * 10,
+                      condition: r.hasCondition ? buildConditionFromItem(r) : null,
+                    })),
+                  };
+                })
+              : undefined;
+
+          // الموعد الأسبوعي
+          const deadlineSpec =
+            s.hasDeadline && s.deadlineTime && s.deadlineDays.length > 0
+              ? {
+                  time: s.deadlineTime,
+                  days: [...s.deadlineDays].sort((a, b) => a - b),
+                }
+              : null;
+
+          const stageInput: PipelineStageInput = {
             name: s.name.trim(),
             stageKey: s.stageKey.trim(),
-            targetStageKeys: isCustomRouting ? s.customTargets : undefined,
+            ...(isCustomRouting && s.customTargets ? { targetStageKeys: s.customTargets } : {}),
             slaMinutes: totalSla > 0 ? totalSla : null,
             // المرحلة الأولى لا تكون مرحلة أرشفة مطلقاً
             isArchive: idx > 0 && (idx === stages.length - 1 || s.isArchive),
@@ -733,6 +1016,8 @@ export function WorkflowPipelineBuilder({
             requiresReceive: s.requiresReceive,
             isProgramManager: s.isProgramManager,
             returnMinutes: totalReturn > 0 ? totalReturn : null,
+            deadlineSpec,
+            deadlineAction: s.deadlineAction,
             participants: s.participants.map((p) => {
               const effectiveRoleId = resolveParticipantRoleId(p);
               return {
@@ -747,17 +1032,11 @@ export function WorkflowPipelineBuilder({
                 isObserver: p.isObserver,
               };
             }),
-            requirements: s.requiresAttachment
-              ? [
-                  {
-                    kind: "attachment",
-                    minAttachments: s.minAttachments || 1,
-                    message: s.attachmentMessage || "يرجى إرفاق المستند قبل الاعتماد",
-                    appliesTo: "advancing",
-                  },
-                ]
-              : [],
+            requirements,
+            ...(actions ? { actions } : {}),
           };
+
+          return stageInput;
         }),
       });
 
@@ -777,9 +1056,21 @@ export function WorkflowPipelineBuilder({
       description={t.workflowAdmin.pipelineBuilderSubtitle}
       footer={
         <div className="flex w-full flex-wrap items-center justify-between gap-3">
-          <div className="text-content-muted flex items-center gap-2 text-xs">
-            <CheckCircle2 className="text-success size-4" />
-            <span>{t.workflowAdmin.autoWiringNotice}</span>
+          <div className="flex flex-wrap items-center gap-4 text-xs">
+            <div className="text-content-muted flex items-center gap-2">
+              <CheckCircle2 className="text-success size-4" />
+              <span>{t.workflowAdmin.autoWiringNotice}</span>
+            </div>
+
+            <label className="flex cursor-pointer items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-2.5 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/10">
+              <input
+                type="checkbox"
+                checked={autoPublish}
+                onChange={(e) => setAutoPublish(e.target.checked)}
+                className="text-primary rounded border-gray-300"
+              />
+              <span>{t.workflowAdmin.publishImmediately}</span>
+            </label>
           </div>
 
           <div className="flex items-center gap-2">
@@ -793,7 +1084,9 @@ export function WorkflowPipelineBuilder({
               disabled={savePipeline.isPending}
               startIcon={<Sparkles aria-hidden className="size-4" />}
             >
-              {t.workflowAdmin.saveAndGeneratePipeline}
+              {autoPublish
+                ? t.workflowAdmin.saveAndPublishPipeline
+                : t.workflowAdmin.saveAndGeneratePipeline}
             </Button>
           </div>
         </div>
@@ -935,6 +1228,8 @@ export function WorkflowPipelineBuilder({
                 stage.claimPolicy !== "none" ||
                 stage.requiresReceive ||
                 stage.requiresAttachment ||
+                stage.hasDeadline ||
+                stage.conditions.length > 0 ||
                 stage.participants.length > 1 ||
                 stage.returnHours > 0 ||
                 stage.returnMinutes > 0;
@@ -1301,249 +1596,6 @@ export function WorkflowPipelineBuilder({
                       </div>
                     </div>
 
-                    {/* زر التبديل للخيارات المتقدمة */}
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateStage(index, { showAdvanced: !stage.showAdvanced })
-                      }
-                      className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-xs font-semibold transition-all ${
-                        stage.showAdvanced
-                          ? "border-primary/50 bg-primary/10 text-primary"
-                          : hasAdvancedConfig
-                            ? "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                            : "border-border text-content-muted hover:bg-surface-sunken"
-                      }`}
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <Sliders className="size-3.5" />
-                        <span>الخيارات والسياسات المتقدمة</span>
-                        {hasAdvancedConfig && (
-                          <span className="size-1.5 rounded-full bg-amber-500" />
-                        )}
-                      </span>
-                      {stage.showAdvanced ? (
-                        <ChevronUp className="size-3.5" />
-                      ) : (
-                        <ChevronDown className="size-3.5" />
-                      )}
-                    </button>
-
-                    {/* قسم الخيارات المتقدمة الموسّع */}
-                    {stage.showAdvanced && (
-                      <div className="border-border/80 bg-surface-sunken/60 flex flex-col gap-3 rounded-lg border p-3 text-xs">
-                        {/* سياسة الإنجاز */}
-                        <div className="flex flex-col gap-1">
-                          <label className="text-content-muted font-medium">
-                            سياسة الإنجاز للمرحلة:
-                          </label>
-                          <Select
-                            value={stage.completionPolicy}
-                            onChange={(e) =>
-                              updateStage(index, {
-                                completionPolicy: e.target.value as CompletionPolicy,
-                              })
-                            }
-                            options={[
-                              { value: "all", label: "الجميع (يجب موافقة كل المشاركين)" },
-                              { value: "any", label: "أوّلهم (يكفي أول من يعتمد)" },
-                              { value: "quorum", label: "نصاب عددي محدد" },
-                            ]}
-                          />
-                        </div>
-
-                        {stage.completionPolicy === "quorum" && (
-                          <div className="flex flex-col gap-1">
-                            <label className="text-content-muted">عدد النصاب المطلوب:</label>
-                            <Input
-                              type="number"
-                              min="1"
-                              value={stage.quorumCount}
-                              onChange={(e) =>
-                                updateStage(index, { quorumCount: Number(e.target.value) })
-                              }
-                            />
-                          </div>
-                        )}
-
-                        {/* سياسة الالتقاء للمسارات المتفرعة */}
-                        <div className="flex flex-col gap-1">
-                          <label className="text-content-muted font-medium">
-                            سياسة الالتقاء (Join Policy):
-                          </label>
-                          <Select
-                            value={stage.joinPolicy}
-                            onChange={(e) =>
-                              updateStage(index, {
-                                joinPolicy: e.target.value as JoinPolicy,
-                              })
-                            }
-                            options={[
-                              { value: "none", label: "عادي (لا ينتظر فروع أخرى)" },
-                              { value: "wait_all", label: "انتظار الجميع wait_all (للمسارات المتفرعة)" },
-                            ]}
-                          />
-                        </div>
-
-                        {/* سياسة الحجز */}
-                        <div className="flex flex-col gap-1">
-                          <label className="text-content-muted font-medium">
-                            سياسة الحجز (Claim Policy):
-                          </label>
-                          <Select
-                            value={stage.claimPolicy}
-                            onChange={(e) =>
-                              updateStage(index, {
-                                claimPolicy: e.target.value as ClaimPolicy,
-                              })
-                            }
-                            options={[
-                              { value: "none", label: "بدون حجز مسبق" },
-                              { value: "exclusive", label: "حجز حصري (يجب حجزها قبل الاعتماد)" },
-                            ]}
-                          />
-                        </div>
-
-                        {/* شروط الجاهزية (المرفقات) */}
-                        <div className="border-border/60 flex flex-col gap-1.5 border-t pt-2">
-                          <label className="text-content flex cursor-pointer items-center gap-2 font-medium">
-                            <input
-                              type="checkbox"
-                              checked={stage.requiresAttachment}
-                              onChange={(e) =>
-                                updateStage(index, { requiresAttachment: e.target.checked })
-                              }
-                              className="text-primary rounded border-gray-300"
-                            />
-                            <Paperclip className="size-3.5 text-amber-500" />
-                            <span>اشتراط رفع مستند قبل الاعتماد</span>
-                          </label>
-
-                          {stage.requiresAttachment && (
-                            <div className="flex flex-col gap-1.5 pr-5">
-                              <Input
-                                value={stage.attachmentMessage}
-                                onChange={(e) =>
-                                  updateStage(index, { attachmentMessage: e.target.value })
-                                }
-                                placeholder="رسالة التنبيه (مثال: أرفق صورة المستخلص موقّعة)"
-                              />
-                            </div>
-                          )}
-                        </div>
-
-                        {/* مهلة الإرجاع المخصصة بالساعات والدقائق */}
-                        <div className="border-border/60 flex flex-col gap-1.5 border-t pt-2">
-                          <label className="text-content-muted flex items-center justify-between font-medium">
-                            <span className="flex items-center gap-1">
-                              <Undo2 className="size-3.5 text-amber-500" />
-                              <span>مهلة الإرجاع عند الرفض للتصحيح:</span>
-                            </span>
-                            {(stage.returnHours > 0 || stage.returnMinutes > 0) && (
-                              <span className="text-amber-500 font-mono text-[11px] font-bold">
-                                {stage.returnHours > 0 ? `${stage.returnHours} س ` : ""}
-                                {stage.returnMinutes > 0 ? `${stage.returnMinutes} د` : ""}
-                              </span>
-                            )}
-                          </label>
-                          <p className="text-content-muted text-[11px]">
-                            المهلة التي تُعطى عند إرجاع المعاملة لتصحيح الخطأ بدلاً من إعادة المهلة الكاملة من البداية.
-                          </p>
-
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="bg-surface border-border/80 flex items-center gap-1.5 rounded-lg border px-2 py-1">
-                              <Input
-                                type="number"
-                                min="0"
-                                value={stage.returnHours === 0 ? "" : stage.returnHours}
-                                onChange={(e) =>
-                                  updateStage(index, {
-                                    returnHours: Math.max(0, Number(e.target.value)),
-                                  })
-                                }
-                                placeholder="0"
-                                className="text-center font-bold"
-                              />
-                              <span className="text-content-muted shrink-0 text-xs">ساعة</span>
-                            </div>
-
-                            <div className="bg-surface border-border/80 flex items-center gap-1.5 rounded-lg border px-2 py-1">
-                              <Input
-                                type="number"
-                                min="0"
-                                max="59"
-                                value={stage.returnMinutes === 0 ? "" : stage.returnMinutes}
-                                onChange={(e) =>
-                                  updateStage(index, {
-                                    returnMinutes: Math.max(
-                                      0,
-                                      Math.min(59, Number(e.target.value)),
-                                    ),
-                                  })
-                                }
-                                placeholder="0"
-                                className="text-center font-bold"
-                              />
-                              <span className="text-content-muted shrink-0 text-xs">دقيقة</span>
-                            </div>
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-1 pt-0.5">
-                            {[
-                              { label: "30 دقيقة", h: 0, m: 30 },
-                              { label: "ساعة واحدة", h: 1, m: 0 },
-                              { label: "ساعتان (120 د)", h: 2, m: 0 },
-                              { label: "4 ساعات", h: 4, m: 0 },
-                            ].map((rPreset) => (
-                              <button
-                                key={rPreset.label}
-                                type="button"
-                                onClick={() =>
-                                  updateStage(index, {
-                                    returnHours: rPreset.h,
-                                    returnMinutes: rPreset.m,
-                                  })
-                                }
-                                className="border-border bg-surface hover:border-amber-500 hover:text-amber-500 rounded border px-2 py-0.5 text-[11px] transition-colors"
-                              >
-                                {rPreset.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* خيارات إضافية */}
-                        <div className="border-border/60 flex flex-col gap-2 border-t pt-2">
-                          <label className="text-content-muted flex cursor-pointer items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={stage.requiresReceive}
-                              onChange={(e) =>
-                                updateStage(index, { requiresReceive: e.target.checked })
-                              }
-                              className="text-primary rounded border-gray-300"
-                            />
-                            <span>يلزم استلام المعاملة أولاً (Requires Receive)</span>
-                          </label>
-
-                          {/* لا تظهر خيار الأرشفة لمرحلة البداية مطلقا */}
-                          {index > 0 && (
-                            <label className="text-content-muted flex cursor-pointer items-center gap-2">
-                              <input
-                                type="checkbox"
-                                checked={stage.isArchive}
-                                onChange={(e) =>
-                                  updateStage(index, { isArchive: e.target.checked })
-                                }
-                                className="text-primary rounded border-gray-300"
-                              />
-                              <span>مرحلة أرشفة نهائية</span>
-                            </label>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
                     {/* خيار سياسة الالتقاء والتجميع wait_all إن كان مفعلاً */}
                     {stage.joinPolicy === "wait_all" && (
                       <div className="flex items-center gap-2 rounded-lg bg-blue-50 dark:bg-blue-950/60 border border-blue-300 dark:border-blue-700/80 px-2.5 py-1.5 text-xs text-blue-950 dark:text-blue-100 font-medium shadow-xs">
@@ -1552,27 +1604,51 @@ export function WorkflowPipelineBuilder({
                       </div>
                     )}
 
-                    {/* قسم المرحلة التالية والتوجيه */}
-                    <div className="bg-surface-sunken border-border/80 flex flex-col gap-2 rounded-lg border p-2.5 text-xs">
+                    {/* قسم المرحلة التالية والتوجيه - بتصميم راديو بارز وواضح جداً */}
+                    <div className="bg-surface-sunken border-border/80 flex flex-col gap-2.5 rounded-lg border p-3 text-xs">
                       <div className="flex items-center justify-between">
-                        <label className="text-content font-bold flex items-center gap-1.5">
+                        <label className="text-content font-bold flex items-center gap-1.5 text-xs">
                           <ArrowLeft className="size-3.5 text-primary" />
                           <span>المرحلة التالية بعد الاعتماد:</span>
                         </label>
+                        {isLast && (
+                          <span className="text-[11px] font-bold text-success flex items-center gap-1">
+                            <CheckCircle2 className="size-3.5" />
+                            نهاية المسار
+                          </span>
+                        )}
+                      </div>
 
-                        {!isLast && (
-                          <div className="flex items-center gap-1 text-[11px]">
+                      {isLast ? (
+                        <div className="text-content-muted flex items-center gap-2 bg-surface rounded-lg border border-border/60 p-2.5 text-xs">
+                          <CheckCircle2 className="size-4 text-success shrink-0" />
+                          <div>
+                            <span className="font-bold text-content block">المرحلة الختامية: اعتماد وأرشفة المعاملة</span>
+                            <span className="text-[11px] text-content-muted">تُغلق المعاملة بعد اعتماد هذه المرحلة وتنتهي دورة سير العمل.</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-2">
+                          {/* مفتاح التبديل البارز والواضح: تلقائي vs مخصص */}
+                          <div className="grid grid-cols-2 gap-2 p-1 bg-surface rounded-lg border border-border">
+                            {/* الخيار 1: خطي تلقائي */}
                             <button
                               type="button"
                               onClick={() => updateStage(index, { targetMode: "auto" })}
-                              className={`rounded px-2 py-0.5 font-medium transition-all ${
+                              className={`flex items-center justify-center gap-2 rounded-md py-2 px-2 text-xs font-bold transition-all ${
                                 stage.targetMode === "auto"
-                                  ? "bg-primary text-white font-semibold shadow-xs"
-                                  : "text-content-muted hover:text-content hover:bg-surface"
+                                  ? "bg-primary text-white shadow-xs ring-1 ring-primary"
+                                  : "text-content-muted hover:text-content hover:bg-surface-sunken"
                               }`}
                             >
-                              تلقائي
+                              <div className={`size-3.5 rounded-full border flex items-center justify-center ${stage.targetMode === "auto" ? "border-white" : "border-border"}`}>
+                                {stage.targetMode === "auto" && <div className="size-1.5 rounded-full bg-white" />}
+                              </div>
+                              <CornerDownLeft className="size-3.5 shrink-0" />
+                              <span>تلقائي (المرحلة التالية)</span>
                             </button>
+
+                            {/* الخيار 2: مخصص وتوازي */}
                             <button
                               type="button"
                               onClick={() => {
@@ -1587,91 +1663,173 @@ export function WorkflowPipelineBuilder({
                                         : [],
                                 });
                               }}
-                              className={`rounded px-2 py-0.5 font-medium transition-all ${
+                              className={`flex items-center justify-center gap-2 rounded-md py-2 px-2 text-xs font-bold transition-all ${
                                 stage.targetMode === "custom"
-                                  ? "bg-amber-600 text-white font-semibold shadow-xs"
-                                  : "text-content-muted hover:text-content hover:bg-surface"
+                                  ? "bg-amber-600 text-white shadow-xs ring-1 ring-amber-600"
+                                  : "text-content-muted hover:text-content hover:bg-surface-sunken"
                               }`}
                             >
-                              مخصص / توازي
+                              <div className={`size-3.5 rounded-full border flex items-center justify-center ${stage.targetMode === "custom" ? "border-white" : "border-border"}`}>
+                                {stage.targetMode === "custom" && <div className="size-1.5 rounded-full bg-white" />}
+                              </div>
+                              <GitFork className="size-3.5 shrink-0" />
+                              <span>مخصص / تفرع متوازي</span>
                             </button>
                           </div>
-                        )}
-                      </div>
 
-                      {isLast ? (
-                        <div className="text-content-muted flex items-center gap-1.5 bg-surface rounded border border-border/60 px-2 py-1.5 text-[11px]">
-                          <CheckCircle2 className="size-3.5 text-success shrink-0" />
-                          <span className="font-medium text-content">المرحلة الختامية: إغلاق وأرشفة المعاملة</span>
-                        </div>
-                      ) : stage.targetMode === "auto" ? (
-                        <div className="text-content-muted flex items-center gap-1.5 bg-surface rounded border border-border/60 px-2 py-1.5 text-[11px]">
-                          <span className="font-semibold text-content">التسلسل الطبيعي:</span>
-                          <span className="text-primary font-medium flex items-center gap-1">
-                            <span>{stages[index + 1]?.name || `المرحلة ${index + 2}`}</span>
-                            <span className="font-mono text-[10px] text-content-muted">
-                              ({stages[index + 1]?.stageKey})
-                            </span>
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col gap-2 pt-0.5">
-                          <p className="text-content-muted text-[11px]">
-                            اختر مرحلة أو أكثر لتنتقل إليها المعاملة عند الاعتماد (اختيار أكثر من مرحلة ينشئ تفرعاً متوازياً):
-                          </p>
-
-                          <div className="grid grid-cols-1 gap-1 max-h-32 overflow-y-auto">
-                            {stages
-                              .filter((_, otherIdx) => otherIdx !== index)
-                              .map((otherStage, otherIdx) => {
-                                const isChecked = stage.customTargets.includes(otherStage.stageKey);
-                                return (
-                                  <label
-                                    key={otherStage.id || otherIdx}
-                                    className={`flex items-center justify-between rounded-md border p-1.5 cursor-pointer text-[11px] transition-all ${
-                                      isChecked
-                                        ? "border-amber-500/60 bg-amber-500/10 font-medium text-amber-900 dark:text-amber-200"
-                                        : "border-border bg-surface text-content hover:bg-surface-sunken"
-                                    }`}
-                                  >
-                                    <div className="flex items-center gap-1.5">
-                                      <input
-                                        type="checkbox"
-                                        checked={isChecked}
-                                        onChange={(e) => {
-                                          const nextTargets = e.target.checked
-                                            ? [...stage.customTargets, otherStage.stageKey]
-                                            : stage.customTargets.filter((k) => k !== otherStage.stageKey);
-                                          updateStage(index, { customTargets: nextTargets });
-                                        }}
-                                        className="text-amber-600 rounded border-gray-300"
-                                      />
-                                      <span>{otherStage.name || `مرحلة ${otherStage.stageKey}`}</span>
-                                    </div>
-                                    <span className="font-mono text-[10px] text-content-muted" dir="ltr">
-                                      {otherStage.stageKey}
-                                    </span>
-                                  </label>
-                                );
-                              })}
-                          </div>
-
-                          {stage.customTargets.length > 1 && (
-                            <div className="flex items-center gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700/80 p-2 text-xs text-amber-950 dark:text-amber-100 shadow-xs">
-                              <GitFork className="size-4 shrink-0 text-amber-700 dark:text-amber-300" />
-                              <span className="leading-relaxed">
-                                <strong className="font-bold text-amber-900 dark:text-amber-200">تفرع متوازي ({stage.customTargets.length} فروع):</strong> ستسير هذه الفروع معاً في نفس الوقت بعد اعتماد هذه المرحلة.
-                              </span>
+                          {/* الشرح والمعاينة للوضع المختار */}
+                          {stage.targetMode === "auto" ? (
+                            <div className="flex items-center justify-between gap-2 bg-surface rounded-lg border border-primary/20 bg-primary/5 p-2.5 text-xs">
+                              <div className="flex items-center gap-2">
+                                <span className="text-content-muted">الوجهة التلقائية بعد الاعتماد:</span>
+                                <span className="text-primary font-bold flex items-center gap-1.5">
+                                  <span>{stages[index + 1]?.name || `المرحلة ${index + 2}`}</span>
+                                  <span className="font-mono text-[11px] text-content-muted font-normal" dir="ltr">
+                                    ({stages[index + 1]?.stageKey})
+                                  </span>
+                                </span>
+                              </div>
+                              <Badge tone="info">خطي متسلسل</Badge>
                             </div>
-                          )}
+                          ) : (
+                            <div className="flex flex-col gap-2 bg-surface rounded-lg border border-amber-500/30 p-2.5">
+                              <div className="flex items-center justify-between">
+                                <span className="text-content font-medium text-[11px]">
+                                  اختر المرحلة (أو المراحل) التي تنتقل إليها المعاملة:
+                                </span>
+                                {stage.customTargets.length > 1 && (
+                                  <Badge tone="warning">تفرع متوازي ({stage.customTargets.length})</Badge>
+                                )}
+                              </div>
 
-                          {stage.customTargets.length === 0 && (
-                            <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
-                              * يرجى تحديد مرحلة واحدة على الأقل كوجهة بعد الاعتماد
-                            </span>
+                              <div className="grid grid-cols-1 gap-1 max-h-36 overflow-y-auto">
+                                {stages
+                                  .filter((_, otherIdx) => otherIdx !== index)
+                                  .map((otherStage, otherIdx) => {
+                                    const isChecked = stage.customTargets.includes(otherStage.stageKey);
+                                    return (
+                                      <label
+                                        key={otherStage.id || otherIdx}
+                                        className={`flex items-center justify-between rounded-md border p-1.5 cursor-pointer text-[11px] transition-all ${
+                                          isChecked
+                                            ? "border-amber-500/60 bg-amber-500/10 font-bold text-amber-900 dark:text-amber-200"
+                                            : "border-border bg-surface-sunken text-content hover:bg-surface"
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <input
+                                            type="checkbox"
+                                            checked={isChecked}
+                                            onChange={(e) => {
+                                              const nextTargets = e.target.checked
+                                                ? [...stage.customTargets, otherStage.stageKey]
+                                                : stage.customTargets.filter((k) => k !== otherStage.stageKey);
+                                              updateStage(index, { customTargets: nextTargets });
+                                            }}
+                                            className="text-amber-600 rounded border-gray-300"
+                                          />
+                                          <span>{otherStage.name || `مرحلة ${otherStage.stageKey}`}</span>
+                                        </div>
+                                        <span className="font-mono text-[10px] text-content-muted" dir="ltr">
+                                          {otherStage.stageKey}
+                                        </span>
+                                      </label>
+                                    );
+                                  })}
+                              </div>
+
+                              {stage.customTargets.length > 1 && (
+                                <p className="text-[11px] text-amber-800 dark:text-amber-200 leading-relaxed bg-amber-500/10 rounded p-1.5">
+                                  <strong>تفرع متوازي:</strong> ستسير هذه المراحل معاً في نفس الوقت، ويمكن ضبط مرحلة لاحقة لتكون محطة تجميع (wait_all).
+                                </p>
+                              )}
+
+                              {stage.customTargets.length === 0 && (
+                                <span className="text-[10px] text-danger font-medium">
+                                  * يرجى اختيار مرحلة تالية واحدة على الأقل
+                                </span>
+                              )}
+                            </div>
                           )}
                         </div>
                       )}
+                    </div>
+
+                    {/* أزرار فتح مودالات السياسات المتقدمة وتخصيص الأزرار */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-border/60">
+                      {/* زر فتح مودال السياسات المتقدمة */}
+                      <button
+                        type="button"
+                        onClick={() => setEditingPoliciesIndex(index)}
+                        className={`flex flex-col gap-1.5 rounded-lg border p-2.5 text-right transition-all hover:shadow-xs ${
+                          hasAdvancedConfig
+                            ? "border-primary/40 bg-primary/5 hover:border-primary"
+                            : "border-border bg-surface hover:bg-surface-sunken"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span className="flex items-center gap-1.5 font-bold text-xs text-content">
+                            <Sliders className="size-3.5 text-primary" />
+                            <span>الخيارات والسياسات المتقدمة</span>
+                          </span>
+                          <span className="text-primary text-[10px] font-semibold underline">تعديل</span>
+                        </div>
+
+                        {/* شارات الحالة المباشرة */}
+                        <div className="flex flex-wrap items-center gap-1 text-[10px]">
+                          {stage.completionPolicy !== "all" && (
+                            <Badge tone="info">
+                              {stage.completionPolicy === "any" ? "أوّلهم" : `نصاب (${stage.quorumCount})`}
+                            </Badge>
+                          )}
+                          {stage.joinPolicy === "wait_all" && (
+                            <Badge tone="neutral">انتظار الجميع</Badge>
+                          )}
+                          {stage.hasDeadline && (
+                            <Badge tone="warning">موعد أسبوعي</Badge>
+                          )}
+                          {(stage.conditions.length > 0 || stage.requiresAttachment) && (
+                            <Badge tone="success">
+                              {stage.conditions.length > 0 ? `${stage.conditions.length} شروط` : "مرفق إلزامي"}
+                            </Badge>
+                          )}
+                          {!hasAdvancedConfig && (
+                            <span className="text-content-muted text-[11px]">السياسات الافتراضية القياسية</span>
+                          )}
+                        </div>
+                      </button>
+
+                      {/* زر فتح مودال تخصيص الأزرار والمسارات */}
+                      <button
+                        type="button"
+                        onClick={() => setEditingActionsIndex(index)}
+                        className={`flex flex-col gap-1.5 rounded-lg border p-2.5 text-right transition-all hover:shadow-xs ${
+                          stage.customActionsEnabled
+                            ? "border-amber-500/40 bg-amber-500/5 hover:border-amber-500"
+                            : "border-border bg-surface hover:bg-surface-sunken"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span className="flex items-center gap-1.5 font-bold text-xs text-content">
+                            <Route className="size-3.5 text-amber-600 dark:text-amber-400" />
+                            <span>تخصيص الأزرار والمسارات</span>
+                          </span>
+                          <span className="text-amber-600 dark:text-amber-400 text-[10px] font-semibold underline">تعديل</span>
+                        </div>
+
+                        {/* شارات حالة الأزرار */}
+                        <div className="flex flex-wrap items-center gap-1 text-[10px]">
+                          {stage.customActionsEnabled ? (
+                            <Badge tone="warning">
+                              مخصص ({stage.actions.length} أزرار)
+                            </Badge>
+                          ) : (
+                            <span className="text-content-muted text-[11px]">
+                              أزرار تلقائية (اعتماد / إرجاع / رفض)
+                            </span>
+                          )}
+                        </div>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1818,6 +1976,27 @@ export function WorkflowPipelineBuilder({
           </div>
         </section>
       </div>
+
+      {/* مودال الخيارات والسياسات المتقدمة للمرحلة */}
+      <StageAdvancedConfigModal
+        isOpen={editingPoliciesIndex !== null}
+        onClose={() => setEditingPoliciesIndex(null)}
+        stage={editingPoliciesIndex !== null ? stages[editingPoliciesIndex] ?? null : null}
+        stageIndex={editingPoliciesIndex ?? 0}
+        totalStages={stages.length}
+        onSave={(idx, updated) => updateStage(idx, updated)}
+      />
+
+      {/* مودال تخصيص أزرار المرحلة ومساراتها الشرطية */}
+      <StageCustomActionsModal
+        isOpen={editingActionsIndex !== null}
+        onClose={() => setEditingActionsIndex(null)}
+        stage={editingActionsIndex !== null ? stages[editingActionsIndex] ?? null : null}
+        stageIndex={editingActionsIndex ?? 0}
+        stages={stages}
+        onSave={(idx, updated) => updateStage(idx, updated)}
+        createDefaultActions={createDefaultActionsForStage}
+      />
     </Modal>
   );
 }

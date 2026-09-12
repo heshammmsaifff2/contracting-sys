@@ -3,6 +3,7 @@ import { toDomainError, ValidationError } from "@core/shared/errors/domain-error
 import { err, ok, okVoid, type Result } from "@core/shared/result";
 import type { CompletionPolicy } from "@core/modules/workflow/entities/StageInstance";
 import type { ActionKind } from "@core/modules/workflow/entities/WorkflowAction";
+import { actionSupportsReturnMinutes } from "@core/modules/workflow/entities/WorkflowAction";
 import type { WorkflowCondition } from "@core/modules/workflow/entities/WorkflowCondition";
 import type {
   ClaimPolicy,
@@ -611,7 +612,7 @@ export class SupabaseWorkflowDefinitionRepository implements IWorkflowDefinition
           }
         }
 
-        // إدراج شروط الجاهزية (مثل اشتراط إرفاق مستندات قبل المتابعة)
+        // إدراج شروط الجاهزية (مثل اشتراط إرفاق مستندات قبل المتابعة أو شروط منطقية)
         if (s.requirements && s.requirements.length > 0) {
           for (let rIdx = 0; rIdx < s.requirements.length; rIdx++) {
             const req = s.requirements[rIdx];
@@ -621,6 +622,10 @@ export class SupabaseWorkflowDefinitionRepository implements IWorkflowDefinition
               .insert({
                 stage_id: currentStageId,
                 kind: req.kind,
+                condition:
+                  req.kind === "condition" && req.condition
+                    ? (JSON.parse(JSON.stringify(req.condition)) as Json)
+                    : null,
                 min_attachments:
                   req.kind === "attachment" ? (req.minAttachments ?? 1) : null,
                 message: req.message || "",
@@ -636,15 +641,75 @@ export class SupabaseWorkflowDefinitionRepository implements IWorkflowDefinition
         }
       }
 
-      // 5. ربط الإجراءات والمسارات تلقائيًا (Auto-wiring)
+      // 5. ربط الإجراءات والمسارات
+      // إذا وفّر المستخدم إجراءات مخصصة لمرحلة، تُحفظ كما هي؛ وإلا إذا كان autoWire مفعلاً، يُنفّذ الربط التلقائي القياسي
       const autoWire = input.autoWireActions !== false;
-      if (autoWire) {
-        for (let i = 0; i < stageCount; i++) {
-          const s = input.stages[i];
-          const currentStageId = stageIds[i];
-          if (!currentStageId) continue;
-          const isFinal = i === stageCount - 1;
 
+      for (let i = 0; i < stageCount; i++) {
+        const s = input.stages[i];
+        const currentStageId = stageIds[i];
+        if (!currentStageId) continue;
+        const isFinal = i === stageCount - 1;
+
+        if (s?.actions && s.actions.length > 0) {
+          // حفظ الإجراءات المخصصة المحددة من المستخدم
+          for (let aIdx = 0; aIdx < s.actions.length; aIdx++) {
+            const act = s.actions[aIdx];
+            if (!act) continue;
+
+            const { data: actData, error: actErr } = await this.client
+              .from("workflow_actions")
+              .insert({
+                stage_id: currentStageId,
+                action_key: (act.actionKey || `action_${aIdx + 1}`).trim().toLowerCase(),
+                label: act.label.trim(),
+                kind: act.kind,
+                sort_order: act.sortOrder ?? aIdx + 1,
+                requires_note: act.requiresNote ?? false,
+                requires_attachment: act.requiresAttachment ?? false,
+                requires_evaluation: act.requiresEvaluation ?? false,
+                return_minutes:
+                  actionSupportsReturnMinutes(act.kind) && act.returnMinutes
+                    ? act.returnMinutes
+                    : null,
+              })
+              .select("id")
+              .single();
+
+            if (actErr) {
+              await rollback();
+              return err(toDomainDbError(actErr, { entity: "إجراء المرحلة" }));
+            }
+
+            // مسارات هذا الإجراء إن وُجدت
+            if (act.routes && act.routes.length > 0) {
+              for (let rIdx = 0; rIdx < act.routes.length; rIdx++) {
+                const r = act.routes[rIdx];
+                if (!r) continue;
+                const targetKey = r.targetStageKey.trim().toLowerCase();
+                const targetId = stageKeyToId.get(targetKey);
+                if (!targetId) continue;
+
+                const { error: rErr } = await this.client
+                  .from("workflow_action_routes")
+                  .insert({
+                    action_id: actData.id,
+                    priority: r.priority ?? (rIdx + 1) * 10,
+                    condition: r.condition
+                      ? (JSON.parse(JSON.stringify(r.condition)) as Json)
+                      : null,
+                    target_stage_id: targetId,
+                  });
+
+                if (rErr) {
+                  await rollback();
+                  return err(toDomainDbError(rErr, { entity: "مسار الإجراء" }));
+                }
+              }
+            }
+          }
+        } else if (autoWire) {
+          // التوجيه التلقائي الافتراضي (Auto-wiring)
           // تحديد الوجهات التالية لهذه المرحلة
           let targetIds: string[] = [];
           if (s?.targetStageKeys && s.targetStageKeys.length > 0) {
@@ -793,6 +858,26 @@ export class SupabaseWorkflowDefinitionRepository implements IWorkflowDefinition
         await rollback();
         return err(toDomainDbError(fetchErr, { entity: "مسار سير العمل" }));
       }
+
+      // 7. نشر المسار فوراً إن طُلِب ذلك
+      if (input.autoPublish) {
+        const pubResult = await this.publishVersion(definitionId);
+        if (!pubResult.ok) {
+          await rollback();
+          return err(pubResult.error);
+        }
+        const { data: publishedDef, error: pubFetchErr } = await this.client
+          .from("workflow_definitions")
+          .select(SELECT_WITH_STAGES)
+          .eq("id", definitionId)
+          .single()
+          .overrideTypes<DefinitionRow>();
+
+        if (!pubFetchErr && publishedDef) {
+          return ok(toDto(publishedDef));
+        }
+      }
+
       return ok(toDto(fullDef));
     } catch (e) {
       return err(toDomainError(e, "تعذّر حفظ مسار خط الأنابيب"));

@@ -204,6 +204,105 @@ export class SavePipelineWorkflow implements UseCase<
           }
         }
       }
+
+      // التحقق من صحة الإجراءات والمسارات المخصصة والشروط إن وُجدت
+      if (s.actions && s.actions.length > 0) {
+        const actionKeys = new Set<string>();
+        for (let aIdx = 0; aIdx < s.actions.length; aIdx++) {
+          const action = s.actions[aIdx];
+          if (!action || !action.label || action.label.trim().length === 0) {
+            return err(
+              new ValidationError(
+                `اسم الإجراء رقم ${aIdx + 1} في المرحلة «${s.name}» مطلوب`,
+                { [`stages.${i}.actions.${aIdx}.label`]: "required" },
+              ),
+            );
+          }
+          const aKey = (action.actionKey || `action_${aIdx + 1}`).trim().toLowerCase();
+          if (actionKeys.has(aKey)) {
+            return err(
+              new ValidationError(
+                `رمز الإجراء «${aKey}» مكرر في المرحلة «${s.name}»`,
+                { [`stages.${i}.actions.${aIdx}.actionKey`]: "duplicate" },
+              ),
+            );
+          }
+          actionKeys.add(aKey);
+
+          if (
+            !actionSupportsReturnMinutes(action.kind) &&
+            action.returnMinutes !== null &&
+            action.returnMinutes !== undefined &&
+            action.returnMinutes > 0
+          ) {
+            return err(
+              new ValidationError("مدّة الإعادة تخصّ إجراء الإرجاع وحده", {
+                [`stages.${i}.actions.${aIdx}.returnMinutes`]: "not_supported",
+              }),
+            );
+          }
+
+          if (action.routes) {
+            for (let rIdx = 0; rIdx < action.routes.length; rIdx++) {
+              const route = action.routes[rIdx];
+              if (!route) continue;
+              const targetKey = route.targetStageKey?.trim().toLowerCase();
+              if (targetKey && !allStageKeys.has(targetKey)) {
+                return err(
+                  new ValidationError(
+                    `المرحلة المستهدفة «${route.targetStageKey}» في إجراء «${action.label}» غير موجودة في هذا المسار`,
+                    {
+                      [`stages.${i}.actions.${aIdx}.routes.${rIdx}.targetStageKey`]:
+                        "not_found",
+                    },
+                  ),
+                );
+              }
+              if (route.condition) {
+                const condValid = validateCondition(route.condition);
+                if (!condValid.ok) {
+                  return err(
+                    new ValidationError(
+                      `شرط التوجيه في إجراء «${action.label}» غير صالح: ${condValid.error.message}`,
+                      {
+                        [`stages.${i}.actions.${aIdx}.routes.${rIdx}.condition`]:
+                          "invalid",
+                      },
+                    ),
+                  );
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // التحقق من شروط الجاهزية المنطقية إن وُجدت
+      if (s.requirements) {
+        for (let rIdx = 0; rIdx < s.requirements.length; rIdx++) {
+          const req = s.requirements[rIdx];
+          if (!req) continue;
+          if (req.kind === "condition") {
+            if (!req.condition) {
+              return err(
+                new ValidationError(
+                  `شرط الجاهزية رقم ${rIdx + 1} في المرحلة «${s.name}» يتطلب تحديد شرط منطقي`,
+                  { [`stages.${i}.requirements.${rIdx}.condition`]: "required" },
+                ),
+              );
+            }
+            const condValid = validateCondition(req.condition);
+            if (!condValid.ok) {
+              return err(
+                new ValidationError(
+                  `شرط الجاهزية في المرحلة «${s.name}» غير صالح: ${condValid.error.message}`,
+                  { [`stages.${i}.requirements.${rIdx}.condition`]: "invalid" },
+                ),
+              );
+            }
+          }
+        }
+      }
     }
 
     return this.repo.savePipeline(input);

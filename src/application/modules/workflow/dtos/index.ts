@@ -217,6 +217,8 @@ export interface TransactionBriefDto {
 }
 
 // ── تعريفات سير العمل ───────────────────────────────────────────────────
+export type { RequirementScope };
+
 /** wait_all = مرحلة التقاء لا تبدأ قبل أن تهدأ الفروع الجارية. */
 export type JoinPolicy = "none" | "wait_all";
 
@@ -437,6 +439,7 @@ export interface SaveWorkflowDefinitionDto {
 
 export interface PipelineStageRequirementInput {
   readonly kind: RequirementKind;
+  readonly condition?: WorkflowCondition | null;
   readonly minAttachments?: number | null;
   readonly message?: string;
   readonly appliesTo?: RequirementScope;
@@ -450,6 +453,24 @@ export interface PipelineStageParticipantInput {
   readonly requiresSign?: boolean;
   readonly isObserver?: boolean;
   readonly isOptional?: boolean;
+}
+
+export interface PipelineStageActionRouteInput {
+  readonly targetStageKey: string;
+  readonly priority?: number;
+  readonly condition?: WorkflowCondition | null;
+}
+
+export interface PipelineStageActionInput {
+  readonly actionKey: string;
+  readonly label: string;
+  readonly kind: ActionKind;
+  readonly sortOrder?: number;
+  readonly requiresNote?: boolean;
+  readonly requiresAttachment?: boolean;
+  readonly requiresEvaluation?: boolean;
+  readonly returnMinutes?: number | null;
+  readonly routes?: readonly PipelineStageActionRouteInput[];
 }
 
 export interface PipelineStageInput {
@@ -470,6 +491,7 @@ export interface PipelineStageInput {
   readonly returnMinutes?: number | null;
   readonly participants?: readonly PipelineStageParticipantInput[];
   readonly requirements?: readonly PipelineStageRequirementInput[];
+  readonly actions?: readonly PipelineStageActionInput[];
   readonly participant?: PipelineStageParticipantInput;
   readonly kind?: ParticipantKind;
   readonly roleId?: string | null;
