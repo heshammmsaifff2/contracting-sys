@@ -10,15 +10,24 @@ import { EMPLOYEE_TYPES } from "@core/modules/identity/entities/Profile";
 import { t } from "@i18n/index";
 
 export const EMPLOYEE_TYPE_LABELS: Record<EmployeeType, string> = {
-  admin: t.users.typeAdmin,
-  engineer: t.users.typeEngineer,
-  supervisor: t.users.typeSupervisor,
-  worker: t.users.typeWorker,
+  administrative: t.users.typeAdministrative,
+  operational: t.users.typeOperational,
 };
 
-/** تسمية آمنة لأي قيمة قادمة من الخادم، ولو لم تعرفها الواجهة بعد. */
+/** القيم القبلية الطيّ — تبقى في لقطات التقييم المجمَّدة فتُسمّى بما طُويت إليه. */
+const LEGACY: Readonly<Record<string, EmployeeType>> = {
+  admin: "administrative",
+  engineer: "operational",
+  supervisor: "operational",
+  worker: "operational",
+};
+
+/** تسمية آمنة لأي قيمة قادمة من الخادم، ولو كانت قديمة أو مجهولة. */
 export function employeeTypeLabel(value: string): string {
-  return EMPLOYEE_TYPE_LABELS[value as EmployeeType] ?? value;
+  const known = EMPLOYEE_TYPE_LABELS[value as EmployeeType];
+  if (known !== undefined) return known;
+  const folded = LEGACY[value];
+  return folded === undefined ? value : EMPLOYEE_TYPE_LABELS[folded];
 }
 
 export const EMPLOYEE_TYPE_OPTIONS: readonly { value: string; label: string }[] =

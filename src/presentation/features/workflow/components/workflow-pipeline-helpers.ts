@@ -9,12 +9,42 @@ import type {
   ConditionOp,
   WorkflowCondition,
 } from "@core/modules/workflow/entities/WorkflowCondition";
-import type { WorkflowDefinitionDto } from "@application/modules/workflow/dtos";
+import type {
+  ParticipantKind,
+  WorkflowDefinitionDto,
+} from "@application/modules/workflow/dtos";
 import type {
   PipelineStageItem,
   StageActionItem,
   StageConditionItem,
 } from "./WorkflowPipelineBuilder";
+
+const BUILDER_KINDS: readonly { value: ParticipantKind; label: string }[] = [
+  { value: "project_job", label: "وظيفة داخل المشروع (مثل مدير المشروع)" },
+  { value: "job", label: "وظيفة على مستوى الشركة (مثل المحاسب)" },
+  { value: "department", label: "قسم كامل" },
+  { value: "requester", label: "مقدّم الطلب (صاحب المعاملة)" },
+  { value: "user", label: "موظف محدد بالاسم" },
+];
+
+const LEGACY_BUILDER_KINDS: Partial<Record<ParticipantKind, string>> = {
+  project_role: "دور في المشروع (نظام قديم)",
+  role: "دور عام في النظام (نظام قديم)",
+  department_role: "دور داخل قسم (نظام قديم)",
+};
+
+/**
+ * أنواع المشارك في المنشئ. النوع القديم يُعرض لمشاركٍ محفوظٍ به فقط —
+ * بغيره تُظهر القائمة أوّل خيار وهو ليس المحفوظ، فيُحفظ غيره سهوًا.
+ */
+export function builderKindOptions(
+  current: ParticipantKind,
+): { value: ParticipantKind; label: string }[] {
+  const legacy = LEGACY_BUILDER_KINDS[current];
+  return legacy === undefined
+    ? [...BUILDER_KINDS]
+    : [...BUILDER_KINDS, { value: current, label: legacy }];
+}
 
 /** ما يكفي من المسار للتحويل — يقبله `WorkflowDefinitionDto` كما هو. */
 export type DefinitionShape = Pick<WorkflowDefinitionDto, "stages">;
@@ -285,6 +315,8 @@ export function definitionToPipelineStages(
           kind: p.kind,
           roleId: p.roleId ?? "",
           userId: p.userId ?? "",
+          jobId: p.jobId ?? "",
+          departmentId: p.departmentId ?? "",
           requiresSign: p.requiresSign,
           isOptional: p.isOptional,
           isObserver: p.isObserver,

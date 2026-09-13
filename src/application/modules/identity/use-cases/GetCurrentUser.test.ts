@@ -14,7 +14,7 @@ function makeProfile(): Profile {
   const profile = Profile.create({
     id: USER_ID,
     fullName: "مهندس الاختبار",
-    employeeType: "engineer",
+    employeeType: "operational",
   });
   if (!profile.ok) throw new Error("setup failed");
   return profile.value;

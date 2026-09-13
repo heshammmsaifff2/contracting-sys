@@ -31,6 +31,14 @@ import { ListPermissions } from "@application/modules/identity/use-cases/ListPer
 import { SetRolePermissions } from "@application/modules/identity/use-cases/SetRolePermissions";
 import { AssignRoleToUser } from "@application/modules/identity/use-cases/AssignRoleToUser";
 import { RemoveRoleFromUser } from "@application/modules/identity/use-cases/RemoveRoleFromUser";
+import {
+  DeleteDepartment,
+  DeleteJob,
+  ListAttachmentAccess,
+  ListDepartments,
+  SaveDepartment,
+  SaveJob,
+} from "@application/modules/organization/use-cases/OrganizationUseCases";
 
 import { ListProjects } from "@application/modules/projects/use-cases/ListProjects";
 import { CreateProject } from "@application/modules/projects/use-cases/CreateProject";
@@ -41,6 +49,7 @@ import { ListProjectMembers } from "@application/modules/projects/use-cases/List
 import { AssignUserToProject } from "@application/modules/projects/use-cases/AssignUserToProject";
 import { SetAssignmentCanSign } from "@application/modules/projects/use-cases/SetAssignmentCanSign";
 import { RemoveProjectAssignment } from "@application/modules/projects/use-cases/RemoveProjectAssignment";
+import { SetAssignmentHolder } from "@application/modules/projects/use-cases/SetAssignmentHolder";
 
 import { SearchItems } from "@application/modules/catalog/use-cases/SearchItems";
 import { CreateItem } from "@application/modules/catalog/use-cases/CreateItem";
@@ -322,6 +331,7 @@ import { SupabaseProfileRepository } from "../supabase/repositories/SupabaseProf
 import { SupabaseProjectAssignmentRepository } from "../supabase/repositories/SupabaseProjectAssignmentRepository";
 import { SupabaseProjectRepository } from "../supabase/repositories/SupabaseProjectRepository";
 import { SupabaseRoleRepository } from "../supabase/repositories/SupabaseRoleRepository";
+import { SupabaseOrganizationRepository } from "../supabase/repositories/SupabaseOrganizationRepository";
 import { SupabaseSettingsRepository } from "../supabase/repositories/SupabaseSettingsRepository";
 import { SupabaseItemRepository } from "../supabase/repositories/SupabaseItemRepository";
 import { SupabaseBoqRepository } from "../supabase/repositories/SupabaseBoqRepository";
@@ -397,6 +407,13 @@ export interface Container {
     readonly setRolePermissions: SetRolePermissions;
     readonly assignRoleToUser: AssignRoleToUser;
     readonly removeRoleFromUser: RemoveRoleFromUser;
+    // الهيكل التنظيمي
+    readonly listDepartments: ListDepartments;
+    readonly listAttachmentAccess: ListAttachmentAccess;
+    readonly saveDepartment: SaveDepartment;
+    readonly deleteDepartment: DeleteDepartment;
+    readonly saveJob: SaveJob;
+    readonly deleteJob: DeleteJob;
     // المشاريع
     readonly listProjects: ListProjects;
     readonly createProject: CreateProject;
@@ -407,6 +424,7 @@ export interface Container {
     readonly assignUserToProject: AssignUserToProject;
     readonly setAssignmentCanSign: SetAssignmentCanSign;
     readonly removeProjectAssignment: RemoveProjectAssignment;
+    readonly setAssignmentHolder: SetAssignmentHolder;
     // الأصناف والبنود
     readonly searchItems: SearchItems;
     readonly createItem: CreateItem;
@@ -661,6 +679,7 @@ export function createContainer(overrides: ContainerOverrides = {}): Container {
   const userAdminService = new EdgeUserAdminService(edgeFn);
   const profileRepository = new SupabaseProfileRepository(client);
   const roleRepository = new SupabaseRoleRepository(client);
+  const organizationRepository = new SupabaseOrganizationRepository(client);
   const authorizationRepository = new SupabaseAuthorizationRepository(client);
   const projectRepository = new SupabaseProjectRepository(client);
   const assignmentRepository = new SupabaseProjectAssignmentRepository(client);
@@ -747,6 +766,12 @@ export function createContainer(overrides: ContainerOverrides = {}): Container {
       setRolePermissions: new SetRolePermissions(roleRepository),
       assignRoleToUser: new AssignRoleToUser(roleRepository),
       removeRoleFromUser: new RemoveRoleFromUser(roleRepository),
+      listDepartments: new ListDepartments(organizationRepository),
+      listAttachmentAccess: new ListAttachmentAccess(organizationRepository),
+      saveDepartment: new SaveDepartment(organizationRepository),
+      deleteDepartment: new DeleteDepartment(organizationRepository),
+      saveJob: new SaveJob(organizationRepository),
+      deleteJob: new DeleteJob(organizationRepository),
 
       listProjects: new ListProjects(projectRepository),
       createProject: new CreateProject(projectRepository, idGenerator),
@@ -757,6 +782,7 @@ export function createContainer(overrides: ContainerOverrides = {}): Container {
       assignUserToProject: new AssignUserToProject(assignmentRepository),
       setAssignmentCanSign: new SetAssignmentCanSign(assignmentRepository),
       removeProjectAssignment: new RemoveProjectAssignment(assignmentRepository),
+      setAssignmentHolder: new SetAssignmentHolder(assignmentRepository),
 
       searchItems: new SearchItems(itemRepository),
       createItem: new CreateItem(itemRepository, idGenerator),

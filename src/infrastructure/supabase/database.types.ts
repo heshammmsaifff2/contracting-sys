@@ -759,23 +759,101 @@ export type Database = {
         }
         Relationships: []
       }
+      department_attachment_access: {
+        Row: {
+          allowed_department_id: string | null
+          created_at: string
+          created_by: string | null
+          department_id: string
+          id: string
+          kind: string
+          user_id: string | null
+        }
+        Insert: {
+          allowed_department_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          department_id: string
+          id?: string
+          kind: string
+          user_id?: string | null
+        }
+        Update: {
+          allowed_department_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          department_id?: string
+          id?: string
+          kind?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "department_attachment_access_allowed_department_id_fkey"
+            columns: ["allowed_department_id"]
+            isOneToOne: false
+            referencedRelation: "department_frequency_report"
+            referencedColumns: ["department_id"]
+          },
+          {
+            foreignKeyName: "department_attachment_access_allowed_department_id_fkey"
+            columns: ["allowed_department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "department_attachment_access_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "department_frequency_report"
+            referencedColumns: ["department_id"]
+          },
+          {
+            foreignKeyName: "department_attachment_access_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "department_attachment_access_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       departments: {
         Row: {
+          classification: string
           created_at: string
+          description: string
           id: string
           name: string
+          restrict_attachments: boolean
+          sort_order: number
           updated_at: string
         }
         Insert: {
+          classification?: string
           created_at?: string
+          description?: string
           id?: string
           name: string
+          restrict_attachments?: boolean
+          sort_order?: number
           updated_at?: string
         }
         Update: {
+          classification?: string
           created_at?: string
+          description?: string
           id?: string
           name?: string
+          restrict_attachments?: boolean
+          sort_order?: number
           updated_at?: string
         }
         Relationships: []
@@ -2115,6 +2193,64 @@ export type Database = {
         }
         Relationships: []
       }
+      jobs: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          department_id: string
+          description: string
+          id: string
+          name: string
+          role_id: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          department_id: string
+          description?: string
+          id?: string
+          name: string
+          role_id: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          department_id?: string
+          description?: string
+          id?: string
+          name?: string
+          role_id?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "jobs_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "department_frequency_report"
+            referencedColumns: ["department_id"]
+          },
+          {
+            foreignKeyName: "jobs_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       journal_entries: {
         Row: {
           created_at: string
@@ -3012,6 +3148,7 @@ export type Database = {
           full_name: string
           id: string
           is_active: boolean
+          job_id: string | null
           updated_at: string
         }
         Insert: {
@@ -3024,6 +3161,7 @@ export type Database = {
           full_name: string
           id: string
           is_active?: boolean
+          job_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -3036,6 +3174,7 @@ export type Database = {
           full_name?: string
           id?: string
           is_active?: boolean
+          job_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -3053,6 +3192,13 @@ export type Database = {
             referencedRelation: "departments"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "profiles_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
         ]
       }
       project_assignments: {
@@ -3061,26 +3207,36 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          job_id: string
           project_id: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           can_sign?: boolean
           created_at?: string
           created_by?: string | null
           id?: string
+          job_id: string
           project_id: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           can_sign?: boolean
           created_at?: string
           created_by?: string | null
           id?: string
+          job_id?: string
           project_id?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "project_assignments_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "project_assignments_project_id_fkey"
             columns: ["project_id"]
@@ -4709,6 +4865,7 @@ export type Database = {
           id: string
           is_authenticated: boolean
           name: string
+          owner_department_id: string | null
           required_permission: string | null
           size_bytes: number
           stage_instance_id: string | null
@@ -4726,6 +4883,7 @@ export type Database = {
           id?: string
           is_authenticated?: boolean
           name: string
+          owner_department_id?: string | null
           required_permission?: string | null
           size_bytes?: number
           stage_instance_id?: string | null
@@ -4743,6 +4901,7 @@ export type Database = {
           id?: string
           is_authenticated?: boolean
           name?: string
+          owner_department_id?: string | null
           required_permission?: string | null
           size_bytes?: number
           stage_instance_id?: string | null
@@ -4803,6 +4962,20 @@ export type Database = {
           {
             foreignKeyName: "transaction_attachments_department_id_fkey"
             columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_owner_department_id_fkey"
+            columns: ["owner_department_id"]
+            isOneToOne: false
+            referencedRelation: "department_frequency_report"
+            referencedColumns: ["department_id"]
+          },
+          {
+            foreignKeyName: "transaction_attachments_owner_department_id_fkey"
+            columns: ["owner_department_id"]
             isOneToOne: false
             referencedRelation: "departments"
             referencedColumns: ["id"]
@@ -5327,18 +5500,21 @@ export type Database = {
           created_at: string
           created_by: string | null
           role_id: string
+          source: string
           user_id: string
         }
         Insert: {
           created_at?: string
           created_by?: string | null
           role_id: string
+          source?: string
           user_id: string
         }
         Update: {
           created_at?: string
           created_by?: string | null
           role_id?: string
+          source?: string
           user_id?: string
         }
         Relationships: [
@@ -5597,6 +5773,7 @@ export type Database = {
           id: string
           is_observer: boolean
           is_optional: boolean
+          job_id: string | null
           kind: string
           requires_sign: boolean
           role_id: string | null
@@ -5610,6 +5787,7 @@ export type Database = {
           id?: string
           is_observer?: boolean
           is_optional?: boolean
+          job_id?: string | null
           kind: string
           requires_sign?: boolean
           role_id?: string | null
@@ -5623,6 +5801,7 @@ export type Database = {
           id?: string
           is_observer?: boolean
           is_optional?: boolean
+          job_id?: string | null
           kind?: string
           requires_sign?: boolean
           role_id?: string | null
@@ -5643,6 +5822,13 @@ export type Database = {
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_stage_participants_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
           {
@@ -7243,6 +7429,10 @@ export type Database = {
       }
       approve_custody: { Args: { p_custody_id: string }; Returns: string }
       approve_extract: { Args: { p_extract_id: string }; Returns: string }
+      attachment_hidden_from_me: {
+        Args: { p_owner_department_id: string; p_uploaded_by: string }
+        Returns: boolean
+      }
       attendance_day_value: { Args: { p_status: string }; Returns: number }
       build_transaction_context: {
         Args: { p_transaction_id: string }
@@ -7393,6 +7583,10 @@ export type Database = {
         Returns: boolean
       }
       is_transaction_participant: {
+        Args: { p_transaction_id: string }
+        Returns: boolean
+      }
+      is_transaction_viewer: {
         Args: { p_transaction_id: string }
         Returns: boolean
       }
@@ -7610,6 +7804,18 @@ export type Database = {
       run_scheduled_task_now: { Args: { p_task_id: string }; Returns: string }
       run_scheduled_tasks: { Args: never; Returns: number }
       run_stage_deadlines: { Args: never; Returns: number }
+      save_department: {
+        Args: {
+          p_access?: Json
+          p_classification: string
+          p_description: string
+          p_id: string
+          p_name: string
+          p_restrict_attachments: boolean
+          p_sort_order: number
+        }
+        Returns: string
+      }
       score_after_warnings: {
         Args: { p_score: number; p_warnings: number }
         Returns: number

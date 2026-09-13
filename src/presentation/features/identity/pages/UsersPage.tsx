@@ -45,11 +45,20 @@ export function UsersPage() {
       ),
     },
     {
-      key: "type",
-      header: t.users.type,
-      render: (row) => (
-        <Badge tone="neutral">{employeeTypeLabel(row.employeeType)}</Badge>
-      ),
+      // الوظيفة تحمل القسم والتصنيف والصلاحيات — فتُقرأ معًا في خانة واحدة
+      key: "job",
+      header: t.users.job,
+      render: (row) =>
+        row.jobName === null ? (
+          <Badge tone="warning">{t.org.noJob}</Badge>
+        ) : (
+          <span className="flex flex-col">
+            <span className="text-content text-sm">{row.jobName}</span>
+            <span className="text-content-muted text-xs">
+              {row.departmentName ?? "—"} · {employeeTypeLabel(row.employeeType)}
+            </span>
+          </span>
+        ),
     },
     {
       key: "roles",

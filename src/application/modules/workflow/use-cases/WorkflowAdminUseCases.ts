@@ -171,6 +171,22 @@ export class SavePipelineWorkflow implements UseCase<
               );
             }
           }
+          if ((p.kind === "job" || p.kind === "project_job") && !p.jobId) {
+            return err(
+              new ValidationError(
+                `يرجى تحديد الوظيفة المطلوبة للمشارك في المرحلة «${stage.name}»`,
+                { [`stages.${i}.participants.${pIdx}.jobId`]: "required" },
+              ),
+            );
+          }
+          if (p.kind === "department" && !p.departmentId) {
+            return err(
+              new ValidationError(
+                `يرجى تحديد القسم المطلوب للمشارك في المرحلة «${stage.name}»`,
+                { [`stages.${i}.participants.${pIdx}.departmentId`]: "required" },
+              ),
+            );
+          }
         }
       }
     }
@@ -479,6 +495,11 @@ export class SaveStageParticipant implements UseCase<SaveStageParticipantDto, vo
           return input.roleId === null || input.departmentId === null
             ? "اختر الدور والقسم معًا"
             : null;
+        case "job":
+        case "project_job":
+          return input.jobId === null ? "اختر الوظيفة" : null;
+        case "department":
+          return input.departmentId === null ? "اختر القسم" : null;
         case "requester":
           return null;
       }

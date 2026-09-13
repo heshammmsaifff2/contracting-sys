@@ -13,20 +13,29 @@ import { toDomainDbError } from "../errors";
 interface AssignmentRow {
   id: string;
   project_id: string;
-  user_id: string;
+  job_id: string;
+  user_id: string | null;
   can_sign: boolean;
   profiles: { full_name: string; code: string | null } | null;
+  jobs: { name: string; departments: { name: string } | null } | null;
 }
 
-const SELECT_WITH_PROFILE =
-  "id, project_id, user_id, can_sign, profiles(full_name, code)";
+// القسم باسم قيده: تقرير تكرار الأقسام يحمل العلاقة نفسها فيلتبس التضمين
+const SELECT_WITH_HOLDER = `
+  id, project_id, job_id, user_id, can_sign,
+  profiles(full_name, code),
+  jobs(name, departments!jobs_department_id_fkey(name))
+`;
 
 function toDto(row: AssignmentRow): ProjectAssignmentDto {
   return {
     id: row.id,
     projectId: row.project_id,
+    jobId: row.job_id,
+    jobName: row.jobs?.name ?? "—",
+    departmentName: row.jobs?.departments?.name ?? null,
     userId: row.user_id,
-    userName: row.profiles?.full_name ?? "",
+    userName: row.profiles?.full_name ?? null,
     userCode: row.profiles?.code ?? null,
     canSign: row.can_sign,
   };
@@ -71,17 +80,16 @@ export class SupabaseProjectAssignmentRepository implements IProjectAssignmentRe
     try {
       const { data, error } = await this.client
         .from("project_assignments")
-        .select(SELECT_WITH_PROFILE)
+        .select(SELECT_WITH_HOLDER)
         .eq("project_id", projectId)
+        .order("created_at", { ascending: true })
         .overrideTypes<AssignmentRow[]>();
 
       if (error)
-        return err(
-          toDomainDbError(error, { entity: "اعتمادات المشروع", id: projectId }),
-        );
+        return err(toDomainDbError(error, { entity: "وظائف المشروع", id: projectId }));
       return ok((data ?? []).map(toDto));
     } catch (e) {
-      return err(toDomainError(e, "تعذّر قراءة اعتمادات المشروع"));
+      return err(toDomainError(e, "تعذّر قراءة وظائف المشروع"));
     }
   }
 
@@ -93,17 +101,18 @@ export class SupabaseProjectAssignmentRepository implements IProjectAssignmentRe
         .from("project_assignments")
         .insert({
           project_id: input.projectId,
+          job_id: input.jobId,
           user_id: input.userId,
           can_sign: input.canSign,
         })
-        .select(SELECT_WITH_PROFILE)
+        .select(SELECT_WITH_HOLDER)
         .single()
         .overrideTypes<AssignmentRow>();
 
-      if (error) return err(toDomainDbError(error, { entity: "اعتماد الموظف" }));
+      if (error) return err(toDomainDbError(error, { entity: "وظيفة المشروع" }));
       return ok(toDto(data));
     } catch (e) {
-      return err(toDomainError(e, "تعذّر اعتماد الموظف على المشروع"));
+      return err(toDomainError(e, "تعذّر إضافة الوظيفة على المشروع"));
     }
   }
 
@@ -114,10 +123,27 @@ export class SupabaseProjectAssignmentRepository implements IProjectAssignmentRe
         .update({ can_sign: canSign })
         .eq("id", id);
 
-      if (error) return err(toDomainDbError(error, { entity: "اعتماد الموظف", id }));
+      if (error) return err(toDomainDbError(error, { entity: "وظيفة المشروع", id }));
       return okVoid();
     } catch (e) {
       return err(toDomainError(e, "تعذّر تعديل حق التوقيع"));
+    }
+  }
+
+  async setHolder(
+    id: string,
+    userId: string | null,
+  ): Promise<Result<void, DomainError>> {
+    try {
+      const { error } = await this.client
+        .from("project_assignments")
+        .update({ user_id: userId })
+        .eq("id", id);
+
+      if (error) return err(toDomainDbError(error, { entity: "شاغل الوظيفة", id }));
+      return okVoid();
+    } catch (e) {
+      return err(toDomainError(e, "تعذّر تغيير شاغل الوظيفة"));
     }
   }
 
@@ -128,10 +154,10 @@ export class SupabaseProjectAssignmentRepository implements IProjectAssignmentRe
         .delete()
         .eq("id", id);
 
-      if (error) return err(toDomainDbError(error, { entity: "اعتماد الموظف", id }));
+      if (error) return err(toDomainDbError(error, { entity: "وظيفة المشروع", id }));
       return okVoid();
     } catch (e) {
-      return err(toDomainError(e, "تعذّر إلغاء الاعتماد"));
+      return err(toDomainError(e, "تعذّر إزالة الوظيفة من المشروع"));
     }
   }
 }

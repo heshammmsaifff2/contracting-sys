@@ -12,20 +12,18 @@ import { err, ok, type Result } from "../../../shared/result";
 import { Code } from "../../../shared/value-objects/code";
 
 /**
- * تصنيف الموظف — يحكم أوزان التقييم ومن يراسل من في وحدة المراسلات.
+ * تصنيف الموظف: إداري أو تشغيلي — يحكم أوزان التقييم.
  *
- * **لا يمنح صلاحيات.** الصلاحيات كلها من الأدوار (`user_roles`)، وخلط
- * الاثنين مصدر لبس متكرّر: تغيير التصنيف لا يفتح شاشة ولا يغلقها.
+ * **يُشتقّ ولا يُكتب.** الموظف يرث تصنيفه من قسم وظيفته، والقاعدة تفرضه
+ * بمُشغّل. فتغيير الوظيفة يغيّره، ولا يُعدَّل وحده.
  *
- * `worker` أُضيف في مرحلة شؤون الموظفين لعمّال اليومية.
+ * كانت أربعة (مدير · مهندس · مشرف · عامل) فطُويت: المدير إداري والباقي تشغيلي.
  */
-export type EmployeeType = "admin" | "engineer" | "supervisor" | "worker";
+export type EmployeeType = "administrative" | "operational";
 
 export const EMPLOYEE_TYPES: readonly EmployeeType[] = [
-  "admin",
-  "engineer",
-  "supervisor",
-  "worker",
+  "administrative",
+  "operational",
 ];
 
 export interface ProfileProps extends AuditableEntityProps {
@@ -64,19 +62,17 @@ export class Profile extends AuditableEntity {
     this.isActive = props.isActive;
   }
 
-  /** Validate and build a profile from raw input. */
-  static create(input: CreateProfileInput): Result<Profile, ValidationError> {
+  /**
+   * قواعد ما يُكتب باليد: الاسم والكود.
+   * التصنيف والقسم يُشتقّان من الوظيفة في القاعدة، فلا يُفحصان هنا.
+   */
+  static validateEditable(input: {
+    fullName: string;
+    code?: string | null;
+  }): Result<{ fullName: string; code: Code | null }, ValidationError> {
     const fullName = input.fullName.trim();
     if (fullName.length < 2) {
       return err(new ValidationError("اسم الموظف مطلوب", { fullName: "required" }));
-    }
-
-    if (!EMPLOYEE_TYPES.includes(input.employeeType)) {
-      return err(
-        new ValidationError("تصنيف الموظف غير صالح", {
-          employeeType: "invalid",
-        }),
-      );
     }
 
     let code: Code | null = null;
@@ -86,6 +82,23 @@ export class Profile extends AuditableEntity {
       code = parsed.value;
     }
 
+    return ok({ fullName, code });
+  }
+
+  /** Validate and build a profile from raw input. */
+  static create(input: CreateProfileInput): Result<Profile, ValidationError> {
+    const editable = Profile.validateEditable(input);
+    if (!editable.ok) return editable;
+
+    if (!EMPLOYEE_TYPES.includes(input.employeeType)) {
+      return err(
+        new ValidationError("تصنيف الموظف غير صالح", {
+          employeeType: "invalid",
+        }),
+      );
+    }
+
+    const { fullName, code } = editable.value;
     const now = new Date();
     return ok(
       new Profile({

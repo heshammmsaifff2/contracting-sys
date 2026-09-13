@@ -11,9 +11,13 @@ import type { Tables } from "@infrastructure/supabase/database.types";
 
 export type ProfileRow = Tables<"profiles">;
 
-/** Narrow an unchecked DB string into the domain union. */
+/**
+ * يضيّق نصًّا غير مفحوص إلى التصنيفين. والقيم القديمة (مدير · مهندس · مشرف ·
+ * عامل) تُحمَل على ما طُويت إليه، فلا يسقط صفٌّ لم تمسّه الهجرة.
+ */
 export function toEmployeeType(raw: string): EmployeeType {
-  return EMPLOYEE_TYPES.includes(raw as EmployeeType) ? (raw as EmployeeType) : "admin";
+  if (EMPLOYEE_TYPES.includes(raw as EmployeeType)) return raw as EmployeeType;
+  return raw === "admin" ? "administrative" : "operational";
 }
 
 export function profileRowToEntity(row: ProfileRow): Profile {

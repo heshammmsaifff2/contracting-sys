@@ -238,8 +238,25 @@ export interface DeadlineSpec {
   days: readonly number[];
 }
 
+/**
+ * من يُكلَّف بالمرحلة.
+ *
+ * المسار يُبنى على **الهيكل التنظيمي**: `project_job` لشاغل الوظيفة المسنَد
+ * على مشروع المعاملة، و`job` لكل شاغليها في الشركة، و`department` لموظفي
+ * قسم. و`user` و`requester` كما هما.
+ *
+ * `role` و`project_role` و`department_role` من النظام السابق: يعمل بها ما
+ * حُفظ عليها، ولا يُختار منها لجديد — الوظيفة هي ما يحمل الدور الآن.
+ */
 export type ParticipantKind =
-  "user" | "role" | "project_role" | "department_role" | "requester";
+  | "job"
+  | "project_job"
+  | "department"
+  | "user"
+  | "requester"
+  | "role"
+  | "project_role"
+  | "department_role";
 
 /**
  * مشارك في تعريف المرحلة.
@@ -257,8 +274,10 @@ export interface StageParticipantDto {
   roleName: string | null;
   departmentId: string | null;
   departmentName: string | null;
+  jobId: string | null;
+  jobName: string | null;
   isOptional: boolean;
-  /** لـ `project_role` وحده: من له حقّ التوقيع على مستندات المشروع فقط. */
+  /** لـ `project_job` و`project_role`: من له حقّ التوقيع على مستندات المشروع فقط. */
   requiresSign: boolean;
   /** يرى المعاملة كلها ولا يُكلَّف بعمل — «مدير عام» ونحوه. */
   isObserver: boolean;
@@ -272,6 +291,7 @@ export interface SaveStageParticipantDto {
   userId: string | null;
   roleId: string | null;
   departmentId: string | null;
+  jobId: string | null;
   isOptional: boolean;
   requiresSign: boolean;
   isObserver: boolean;
@@ -450,6 +470,7 @@ export interface PipelineStageParticipantInput {
   readonly roleId?: string | null;
   readonly userId?: string | null;
   readonly departmentId?: string | null;
+  readonly jobId?: string | null;
   readonly requiresSign?: boolean;
   readonly isObserver?: boolean;
   readonly isOptional?: boolean;
@@ -497,6 +518,7 @@ export interface PipelineStageInput {
   readonly roleId?: string | null;
   readonly userId?: string | null;
   readonly departmentId?: string | null;
+  readonly jobId?: string | null;
   readonly requiresSign?: boolean;
   readonly isObserver?: boolean;
   readonly isOptional?: boolean;

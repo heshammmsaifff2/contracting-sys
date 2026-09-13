@@ -6,8 +6,10 @@ import type { AssignUserToProjectDto, ProjectAssignmentDto } from "../dtos";
 import type { IProjectAssignmentRepository } from "../ports/project-assignment-repository";
 
 /**
- * اعتماد موظف على مشروع — وهو ما يفتح له رؤية المشروع والتوقيع عليه.
- * صلاحية project.assign تُفرض في RLS، وهذه الطبقة تتحقّق من صحة المدخلات فقط.
+ * إضافة خانة وظيفة على المشروع، بشاغلها أو شاغرة.
+ *
+ * أن يكون الشاغل من شاغلي الوظيفة فعلًا يُفرض في القاعدة — فهي وحدها تعرف
+ * وظيفته لحظة الحفظ. وصلاحية project.assign تُفرض في RLS.
  */
 export class AssignUserToProject implements UseCase<
   AssignUserToProjectDto,
@@ -25,10 +27,13 @@ export class AssignUserToProject implements UseCase<
     if (input.projectId.trim().length === 0) {
       return err(new ValidationError("المشروع مطلوب", { projectId: "required" }));
     }
-    if (input.userId.trim().length === 0) {
-      return err(new ValidationError("الموظف مطلوب", { userId: "required" }));
+    if (input.jobId.trim().length === 0) {
+      return err(new ValidationError("اختر الوظيفة", { jobId: "required" }));
     }
 
-    return this.assignments.assign(input);
+    return this.assignments.assign({
+      ...input,
+      userId: input.userId === null || input.userId.trim() === "" ? null : input.userId,
+    });
   }
 }

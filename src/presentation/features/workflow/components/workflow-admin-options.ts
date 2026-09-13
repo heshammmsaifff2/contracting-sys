@@ -7,7 +7,10 @@
  */
 import type { ActionKind } from "@core/modules/workflow/entities/WorkflowAction";
 import type { ConditionOp } from "@core/modules/workflow/entities/WorkflowCondition";
-import type { StageParticipantDto } from "@application/modules/workflow/dtos";
+import type {
+  ParticipantKind,
+  StageParticipantDto,
+} from "@application/modules/workflow/dtos";
 import { t } from "@i18n/index";
 
 /** لون السهم على اللوحة — forward أخضر · backward أحمر · closure بنّي · final كحلي. */
@@ -25,11 +28,12 @@ export const POLICY_OPTIONS = [
   { value: "quorum", label: t.workflowAdmin.policyQuorum },
 ];
 
-// `department_role` مدعوم في المحرّك، ويظهر هنا حين تُضاف شاشة الأقسام
-export const KIND_OPTIONS = [
+/** ما يُختار لمشاركٍ جديد — مبنيٌّ على الأقسام والوظائف. */
+export const KIND_OPTIONS: readonly { value: ParticipantKind; label: string }[] = [
+  { value: "project_job", label: t.workflowAdmin.kindProjectJob },
+  { value: "job", label: t.workflowAdmin.kindJob },
+  { value: "department", label: t.workflowAdmin.kindDepartment },
   { value: "user", label: t.workflowAdmin.kindUser },
-  { value: "project_role", label: t.workflowAdmin.kindProjectRole },
-  { value: "role", label: t.workflowAdmin.kindRole },
   { value: "requester", label: t.workflowAdmin.kindRequester },
 ];
 
@@ -110,6 +114,15 @@ export function participantLabel(participant: StageParticipantDto): string {
       );
     case "department_role":
       return `${participant.roleName ?? "—"} · ${participant.departmentName ?? "—"}`;
+    case "job":
+      return `${participant.jobName ?? "—"} · ${t.workflowAdmin.companyWide}`;
+    case "project_job":
+      return (
+        `${participant.jobName ?? "—"} · ${t.workflowAdmin.ofProject}` +
+        (participant.requiresSign ? ` · ${t.workflowAdmin.signersOnly}` : "")
+      );
+    case "department":
+      return `${t.workflowAdmin.department}: ${participant.departmentName ?? "—"}`;
     case "requester":
       return t.workflowAdmin.kindRequester;
   }

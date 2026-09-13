@@ -14,7 +14,7 @@ import {
 import type { AppSupabaseClient } from "../client";
 import { toDomainDbError } from "../errors";
 
-/** شكل صف الموظف مع أدواره كما يُرجعه select المتداخل. */
+/** شكل صف الموظف مع وظيفته وأدواره كما يُرجعه select المتداخل. */
 interface ProfileWithRolesRow {
   id: string;
   code: string | null;
@@ -22,8 +22,21 @@ interface ProfileWithRolesRow {
   full_name: string;
   employee_type: string;
   is_active: boolean;
-  user_roles: { roles: { key: string; name: string } | null }[] | null;
+  job_id: string | null;
+  department_id: string | null;
+  jobs: { name: string } | null;
+  departments: { name: string } | null;
+  user_roles: { source: string; roles: { key: string; name: string } | null }[] | null;
 }
+
+// العلاقات بأسماء قيودها: جدول استثناءات المرفقات يربط الموظفين بالأقسام
+// أيضًا، فالتضمين بلا تسمية قد يُرفض لالتباسه
+const LIST_SELECT = `
+  id, code, email, full_name, employee_type, is_active, job_id, department_id,
+  jobs!profiles_job_id_fkey(name),
+  departments!profiles_department_id_fkey(name),
+  user_roles(source, roles(key, name))
+`;
 
 export class SupabaseProfileRepository implements IProfileRepository {
   private readonly client: AppSupabaseClient;
@@ -53,9 +66,7 @@ export class SupabaseProfileRepository implements IProfileRepository {
     try {
       const { data, error } = await this.client
         .from("profiles")
-        .select(
-          "id, code, email, full_name, employee_type, is_active, user_roles(roles(key, name))",
-        )
+        .select(LIST_SELECT)
         .order("full_name", { ascending: true })
         .overrideTypes<ProfileWithRolesRow[]>();
 
@@ -63,9 +74,10 @@ export class SupabaseProfileRepository implements IProfileRepository {
 
       return ok(
         (data ?? []).map((row) => {
-          const roles = (row.user_roles ?? [])
-            .map((link) => link.roles)
-            .filter((role): role is { key: string; name: string } => role !== null);
+          const links = (row.user_roles ?? []).filter(
+            (link): link is { source: string; roles: { key: string; name: string } } =>
+              link.roles !== null,
+          );
 
           return {
             id: row.id,
@@ -74,8 +86,15 @@ export class SupabaseProfileRepository implements IProfileRepository {
             fullName: row.full_name,
             employeeType: toEmployeeType(row.employee_type),
             isActive: row.is_active,
-            roleKeys: roles.map((r) => r.key),
-            roleNames: roles.map((r) => r.name),
+            roleKeys: links.map((l) => l.roles.key),
+            roleNames: links.map((l) => l.roles.name),
+            jobId: row.job_id,
+            jobName: row.jobs?.name ?? null,
+            departmentId: row.department_id,
+            departmentName: row.departments?.name ?? null,
+            jobRoleKeys: links
+              .filter((l) => l.source === "job")
+              .map((l) => l.roles.key),
           } satisfies ProfileDto;
         }),
       );
@@ -86,12 +105,13 @@ export class SupabaseProfileRepository implements IProfileRepository {
 
   async update(input: UpdateProfileInput): Promise<Result<Profile, DomainError>> {
     try {
+      // القسم والتصنيف والدور يتبعون الوظيفة بمُشغّلات القاعدة
       const { data, error } = await this.client
         .from("profiles")
         .update({
           full_name: input.fullName,
           code: input.code,
-          employee_type: input.employeeType,
+          ...(input.jobId === undefined ? {} : { job_id: input.jobId }),
         })
         .eq("id", input.id)
         .select("*")

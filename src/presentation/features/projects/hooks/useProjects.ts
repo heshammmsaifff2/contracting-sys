@@ -103,6 +103,22 @@ export function useSetAssignmentCanSign(projectId: string) {
   });
 }
 
+export function useSetAssignmentHolder(projectId: string) {
+  const { setAssignmentHolder } = useUseCases();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { id: string; userId: string | null }) =>
+      unwrap(await setAssignmentHolder.execute(input)),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: assignmentsKey(projectId) });
+      await queryClient.invalidateQueries({ queryKey: PROJECTS_KEY });
+      // تغيير الشاغل يغيّر من يرى المشروع
+      await queryClient.invalidateQueries({ queryKey: ["current-user"] });
+    },
+  });
+}
+
 export function useRemoveAssignment(projectId: string) {
   const { removeProjectAssignment } = useUseCases();
   const queryClient = useQueryClient();

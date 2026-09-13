@@ -5,6 +5,7 @@ import { screenPermission } from "@presentation/shared/layouts/nav-items";
 import {
   UsersPage,
   RolesPage,
+  OrganizationPage,
   ProjectsPage,
   SettingsPage,
   DashboardPage,
@@ -86,6 +87,10 @@ export const routeTree = [
           {
             element: <ProtectedRoute permission={screenPermission("/roles")} />,
             children: [{ path: "roles", element: <RolesPage /> }],
+          },
+          {
+            element: <ProtectedRoute permission={screenPermission("/organization")} />,
+            children: [{ path: "organization", element: <OrganizationPage /> }],
           },
           {
             element: <ProtectedRoute permission={screenPermission("/items")} />,

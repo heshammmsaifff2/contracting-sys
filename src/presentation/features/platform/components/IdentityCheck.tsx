@@ -8,13 +8,8 @@ import { useAuth } from "@presentation/app/providers/auth-context";
 import { Badge } from "@presentation/shared/ui/Badge";
 import { EmptyState } from "@presentation/shared/ui/EmptyState";
 import { formatNumber } from "@presentation/shared/lib/formatters";
+import { employeeTypeLabel } from "@presentation/shared/lib/employee-type";
 import { t } from "@i18n/index";
-
-const TYPE_LABELS: Record<string, string> = {
-  admin: t.users.typeAdmin,
-  engineer: t.users.typeEngineer,
-  supervisor: t.users.typeSupervisor,
-};
 
 export function IdentityCheck() {
   const { user } = useAuth();
@@ -37,7 +32,7 @@ export function IdentityCheck() {
         <div className="bg-surface-sunken rounded-[var(--radius-control)] p-3">
           <dt className="text-content-muted text-xs">{t.users.type}</dt>
           <dd className="text-content mt-0.5 text-sm font-medium">
-            {TYPE_LABELS[user.profile.employeeType]}
+            {employeeTypeLabel(user.profile.employeeType)}
           </dd>
         </div>
         <div className="bg-surface-sunken rounded-[var(--radius-control)] p-3">

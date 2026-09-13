@@ -7,6 +7,7 @@ import type {
 } from "../dtos";
 
 export interface IProjectAssignmentRepository {
+  /** خانات وظائف المشروع بشاغليها. */
   listByProject(
     projectId: string,
   ): Promise<Result<readonly ProjectAssignmentDto[], DomainError>>;
@@ -18,5 +19,7 @@ export interface IProjectAssignmentRepository {
     input: AssignUserToProjectDto,
   ): Promise<Result<ProjectAssignmentDto, DomainError>>;
   setCanSign(id: string, canSign: boolean): Promise<Result<void, DomainError>>;
+  /** يملأ الخانة أو يغيّر شاغلها أو يُفرغها (null). */
+  setHolder(id: string, userId: string | null): Promise<Result<void, DomainError>>;
   remove(id: string): Promise<Result<void, DomainError>>;
 }

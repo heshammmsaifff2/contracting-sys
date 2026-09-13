@@ -9,7 +9,7 @@
  * الحيّ من قائمة الموظفين، فتتحرّك العلامة حين يتحرّك الواقع.
  */
 import { useMemo, useState } from "react";
-import { Check, Search, ShieldAlert } from "lucide-react";
+import { Check, Lock, Search, ShieldAlert } from "lucide-react";
 import { Button } from "@presentation/shared/ui/Button";
 import { Input } from "@presentation/shared/ui/Input";
 import { Modal } from "@presentation/shared/ui/Modal";
@@ -43,6 +43,11 @@ export function UserRolesModal({ isOpen, onClose, profileId }: UserRolesModalPro
 
   const profile = (profiles.data ?? []).find((p) => p.id === profileId) ?? null;
   const assigned = useMemo(() => new Set(profile?.roleKeys ?? []), [profile?.roleKeys]);
+  // دور الوظيفة يتبعها: يُسحب بتغييرها لا من هنا، والقاعدة ترفض سحبه باليد
+  const fromJob = useMemo(
+    () => new Set(profile?.jobRoleKeys ?? []),
+    [profile?.jobRoleKeys],
+  );
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -99,6 +104,10 @@ export function UserRolesModal({ isOpen, onClose, profileId }: UserRolesModalPro
             </span>
           </div>
 
+          <p className="text-content-muted bg-surface-sunken rounded-[var(--radius-control)] p-2 text-xs">
+            {t.users.rolesExtraHint}
+          </p>
+
           {assigned.size === 0 && (
             <p className="text-warning bg-warning-soft flex items-start gap-2 rounded-[var(--radius-control)] p-2 text-xs">
               <ShieldAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
@@ -126,13 +135,17 @@ export function UserRolesModal({ isOpen, onClose, profileId }: UserRolesModalPro
             {visible.map((role) => {
               const isOn = assigned.has(role.key);
               const isBusy = busyRoleId === role.id;
+              const isLocked = fromJob.has(role.key);
               return (
                 <li key={role.id}>
                   <button
                     type="button"
                     role="switch"
                     aria-checked={isOn}
-                    disabled={isBusy}
+                    disabled={isBusy || isLocked}
+                    title={
+                      isLocked ? t.users.fromJob(profile.jobName ?? "—") : undefined
+                    }
                     onClick={() => void toggle(role.id, role.name, !isOn)}
                     className={[
                       "flex w-full items-start gap-3 p-3 text-start",
@@ -150,7 +163,9 @@ export function UserRolesModal({ isOpen, onClose, profileId }: UserRolesModalPro
                           : "border-border-strong",
                       ].join(" ")}
                     >
-                      {isBusy ? (
+                      {isLocked ? (
+                        <Lock className="size-3" strokeWidth={3} />
+                      ) : isBusy ? (
                         <span className="border-content-muted size-3 animate-spin rounded-full border-2 border-t-transparent" />
                       ) : isOn ? (
                         <Check className="size-3.5" strokeWidth={3} />
@@ -158,8 +173,13 @@ export function UserRolesModal({ isOpen, onClose, profileId }: UserRolesModalPro
                     </span>
 
                     <span className="flex min-w-0 flex-col gap-0.5">
-                      <span className="text-content text-sm font-medium">
+                      <span className="text-content flex flex-wrap items-center gap-2 text-sm font-medium">
                         {role.name}
+                        {isLocked && (
+                          <span className="text-brand-700 bg-brand-50 rounded-full px-2 py-0.5 text-[11px] font-normal">
+                            {t.users.fromJob(profile.jobName ?? "—")}
+                          </span>
+                        )}
                       </span>
                       <span className="text-content-muted text-xs">
                         {role.description ?? role.key}

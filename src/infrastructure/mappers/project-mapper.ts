@@ -10,6 +10,9 @@ export interface ProjectRowWithRelations extends ProjectRow {
   manager: { full_name: string } | null;
   extracts_officer: { full_name: string } | null;
   project_assignments: { count: number }[] | null;
+  /** خانات الوظائف بشاغليها — والشاغرة بلا ملف. */
+  slots:
+    { jobs: { name: string } | null; profiles: { full_name: string } | null }[] | null;
 }
 
 function toStatus(raw: string): ProjectStatus {
@@ -32,5 +35,9 @@ export function projectRowToDto(row: ProjectRowWithRelations): ProjectDto {
     extractsOfficerName: row.extracts_officer?.full_name ?? null,
     status: toStatus(row.status),
     assigneeCount: row.project_assignments?.[0]?.count ?? 0,
+    jobSlots: (row.slots ?? []).map((slot) => ({
+      jobName: slot.jobs?.name ?? "—",
+      holderName: slot.profiles?.full_name ?? null,
+    })),
   };
 }

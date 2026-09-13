@@ -14,11 +14,9 @@ export class UpdateProfile implements UseCase<UpdateProfileInput, Profile> {
 
   async execute(input: UpdateProfileInput): Promise<Result<Profile, DomainError>> {
     // نتحقّق بقواعد الدومين قبل لمس قاعدة البيانات
-    const validated = Profile.create({
-      id: input.id,
-      code: input.code,
+    const validated = Profile.validateEditable({
       fullName: input.fullName,
-      employeeType: input.employeeType,
+      code: input.code,
     });
     if (!validated.ok) return validated;
 
@@ -26,7 +24,7 @@ export class UpdateProfile implements UseCase<UpdateProfileInput, Profile> {
       id: input.id,
       fullName: validated.value.fullName,
       code: validated.value.code?.value ?? null,
-      employeeType: validated.value.employeeType,
+      ...(input.jobId === undefined ? {} : { jobId: input.jobId }),
     });
   }
 }

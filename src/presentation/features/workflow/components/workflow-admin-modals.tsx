@@ -36,14 +36,12 @@ import {
 import { Button } from "@presentation/shared/ui/Button";
 import { Input } from "@presentation/shared/ui/Input";
 import { Select } from "@presentation/shared/ui/Select";
+import { Combobox } from "@presentation/shared/ui/Combobox";
 import { Checkbox } from "@presentation/shared/ui/Checkbox";
 import { FormField } from "@presentation/shared/ui/FormField";
 import { Modal } from "@presentation/shared/ui/Modal";
 import { errorMessage } from "@presentation/shared/lib/query";
-import {
-  useProfiles,
-  useRoles,
-} from "@presentation/features/identity/hooks/useIdentity";
+import { useProfiles } from "@presentation/features/identity/hooks/useIdentity";
 import {
   useSaveActionRoute,
   useSaveStageRequirement,
@@ -63,6 +61,11 @@ import {
   OP_OPTIONS,
   POLICY_OPTIONS,
 } from "./workflow-admin-options";
+import { useDepartments } from "@presentation/features/organization/hooks/useOrganization";
+import {
+  departmentOptions,
+  jobOptions,
+} from "@presentation/features/organization/lib/org-options";
 import { t } from "@i18n/index";
 
 export function DefinitionModal({
@@ -517,19 +520,20 @@ export function ParticipantModal({
   onClose: () => void;
 }) {
   const save = useSaveStageParticipant();
-  const roles = useRoles();
   const profiles = useProfiles();
+  const departments = useDepartments();
 
-  const [kind, setKind] = useState<ParticipantKind>("user");
+  // الأشيع: مدير المشروع ومهندسه يتغيّران من مشروع لآخر، والوظيفة ثابتة
+  const [kind, setKind] = useState<ParticipantKind>("project_job");
   const [userId, setUserId] = useState("");
-  const [roleId, setRoleId] = useState("");
+  const [jobId, setJobId] = useState("");
+  const [departmentId, setDepartmentId] = useState("");
   const [isOptional, setIsOptional] = useState(false);
   const [requiresSign, setRequiresSign] = useState(false);
   const [isObserver, setIsObserver] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // `project_role` و`role` كلاهما يحمل دورًا؛ والفرق نطاق الحلّ لا شكل النموذج
-  const needsRole = kind === "role" || kind === "project_role";
+  const needsJob = kind === "job" || kind === "project_job";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -540,10 +544,12 @@ export function ParticipantModal({
         stageId: stage.id,
         kind,
         userId: kind === "user" && userId !== "" ? userId : null,
-        roleId: needsRole && roleId !== "" ? roleId : null,
-        departmentId: null,
+        roleId: null,
+        jobId: needsJob && jobId !== "" ? jobId : null,
+        departmentId:
+          kind === "department" && departmentId !== "" ? departmentId : null,
         isOptional: isObserver ? false : isOptional,
-        requiresSign: kind === "project_role" && requiresSign,
+        requiresSign: kind === "project_job" && requiresSign,
         isObserver,
         sortOrder: stage.participants.length + 1,
       });
@@ -590,46 +596,66 @@ export function ParticipantModal({
           )}
         </FormField>
 
-        {kind === "user" && (
-          <FormField label={t.workflowAdmin.employee} required>
-            {(id) => (
-              <Select
-                id={id}
-                options={(profiles.data ?? [])
-                  .filter((profile) => profile.isActive)
-                  .map((profile) => ({ value: profile.id, label: profile.fullName }))}
-                placeholder={t.projects.none}
-                value={userId}
-                onChange={(e) => setUserId(e.target.value)}
-              />
-            )}
-          </FormField>
-        )}
-
-        {kind === "project_role" && (
+        {kind === "project_job" && (
           <p className="text-content-muted bg-surface-sunken rounded-md p-3 text-sm">
-            {t.workflowAdmin.kindProjectRoleHint}
+            {t.workflowAdmin.kindProjectJobHint}
           </p>
         )}
 
-        {needsRole && (
-          <FormField label={t.workflowAdmin.role} required>
+        {needsJob && (
+          <FormField label={t.workflowAdmin.jobField} required>
             {(id) => (
-              <Select
+              <Combobox
                 id={id}
-                options={(roles.data ?? []).map((role) => ({
-                  value: role.id,
-                  label: role.name,
-                }))}
-                placeholder={t.projects.none}
-                value={roleId}
-                onChange={(e) => setRoleId(e.target.value)}
+                options={jobOptions(departments.data ?? [])}
+                value={jobId}
+                onChange={setJobId}
+                placeholder={t.workflowAdmin.searchJob}
+                noMatchesText={t.common.noSearchMatches}
               />
             )}
           </FormField>
         )}
 
-        {kind === "project_role" && (
+        {kind === "department" && (
+          <FormField label={t.workflowAdmin.department} required>
+            {(id) => (
+              <Combobox
+                id={id}
+                options={departmentOptions(departments.data ?? [])}
+                value={departmentId}
+                onChange={setDepartmentId}
+                placeholder={t.workflowAdmin.searchDepartment}
+                noMatchesText={t.common.noSearchMatches}
+              />
+            )}
+          </FormField>
+        )}
+
+        {kind === "user" && (
+          <FormField label={t.workflowAdmin.employee} required>
+            {(id) => (
+              <Combobox
+                id={id}
+                options={(profiles.data ?? [])
+                  .filter((profile) => profile.isActive)
+                  .map((profile) => ({
+                    value: profile.id,
+                    label:
+                      profile.jobName === null
+                        ? profile.fullName
+                        : `${profile.fullName} — ${profile.jobName}`,
+                  }))}
+                value={userId}
+                onChange={setUserId}
+                placeholder={t.workflowAdmin.searchEmployee}
+                noMatchesText={t.common.noSearchMatches}
+              />
+            )}
+          </FormField>
+        )}
+
+        {kind === "project_job" && (
           <Checkbox
             label={t.workflowAdmin.requiresSign}
             hint={t.workflowAdmin.requiresSignHint}

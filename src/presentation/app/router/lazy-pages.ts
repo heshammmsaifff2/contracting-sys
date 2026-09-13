@@ -19,6 +19,11 @@ export const RolesPage = lazy(() =>
     default: m.RolesPage,
   })),
 );
+export const OrganizationPage = lazy(() =>
+  import("@presentation/features/organization/pages/OrganizationPage").then((m) => ({
+    default: m.OrganizationPage,
+  })),
+);
 export const ProjectsPage = lazy(() =>
   import("@presentation/features/projects/pages/ProjectsPage").then((m) => ({
     default: m.ProjectsPage,

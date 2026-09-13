@@ -63,7 +63,7 @@ const EFFECT_OPTIONS = [
 
 const TYPE_OPTIONS = [
   { value: "", label: t.evalRules.allTypes },
-  ...["admin", "engineer", "supervisor"].map((value) => ({
+  ...["administrative", "operational"].map((value) => ({
     value,
     label: employeeTypeLabel(value),
   })),

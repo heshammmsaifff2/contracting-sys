@@ -7,9 +7,8 @@ import type { CreateUserInput } from "../dtos";
 import type { IUserAdminService } from "../ports/user-admin-service";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MIN_PASSWORD_LENGTH = 8;
-/** معرّف صوري للتحقّق فقط — المعرّف الحقيقي يصدر من مزوّد المصادقة. */
-const PLACEHOLDER_ID = "00000000-0000-0000-0000-000000000000";
 
 export class CreateUser implements UseCase<CreateUserInput, { userId: string }> {
   private readonly admin: IUserAdminService;
@@ -35,12 +34,13 @@ export class CreateUser implements UseCase<CreateUserInput, { userId: string }> 
         }),
       );
     }
+    if (input.jobId !== null && !UUID_PATTERN.test(input.jobId)) {
+      return err(new ValidationError("الوظيفة غير صالحة", { jobId: "invalid" }));
+    }
 
-    // نستخدم قواعد الدومين نفسها للتحقّق من الاسم والكود والتصنيف
-    const validated = Profile.create({
-      id: PLACEHOLDER_ID,
+    // التصنيف لا يُفحص: يُشتقّ من الوظيفة عند إنشاء الملف
+    const validated = Profile.validateEditable({
       fullName: input.fullName,
-      employeeType: input.employeeType,
       code: input.code ?? null,
     });
     if (!validated.ok) return validated;
@@ -49,7 +49,7 @@ export class CreateUser implements UseCase<CreateUserInput, { userId: string }> 
       email,
       password: input.password,
       fullName: validated.value.fullName,
-      employeeType: validated.value.employeeType,
+      jobId: input.jobId,
       code: validated.value.code?.value ?? null,
       roleKeys: input.roleKeys ?? [],
     });

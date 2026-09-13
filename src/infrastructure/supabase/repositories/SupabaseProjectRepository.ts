@@ -15,7 +15,7 @@ import type { AppSupabaseClient } from "../client";
 import { toDomainDbError } from "../errors";
 
 const SELECT_WITH_RELATIONS =
-  "*, manager:profiles!projects_manager_id_fkey(full_name), extracts_officer:profiles!projects_extracts_officer_id_fkey(full_name), project_assignments(count)";
+  "*, manager:profiles!projects_manager_id_fkey(full_name), extracts_officer:profiles!projects_extracts_officer_id_fkey(full_name), project_assignments(count), slots:project_assignments(jobs(name), profiles(full_name))";
 
 export class SupabaseProjectRepository implements IProjectRepository {
   private readonly client: AppSupabaseClient;

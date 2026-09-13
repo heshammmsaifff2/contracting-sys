@@ -52,9 +52,9 @@ const SELECT_WITH_STAGES = `
       id, stage_id, kind, condition, min_attachments, message, applies_to, sort_order
     ),
     workflow_stage_participants(
-      id, stage_id, kind, user_id, role_id, department_id, is_optional,
+      id, stage_id, kind, user_id, role_id, department_id, job_id, is_optional,
       requires_sign, is_observer, sort_order,
-      profiles(full_name), roles(name), departments(name)
+      profiles(full_name), roles(name), departments(name), jobs(name)
     ),
     workflow_actions(
       id, stage_id, action_key, label, kind, sort_order,
@@ -74,6 +74,7 @@ interface ParticipantRow {
   user_id: string | null;
   role_id: string | null;
   department_id: string | null;
+  job_id: string | null;
   is_optional: boolean;
   requires_sign: boolean;
   is_observer: boolean;
@@ -81,6 +82,7 @@ interface ParticipantRow {
   profiles: { full_name: string } | null;
   roles: { name: string } | null;
   departments: { name: string } | null;
+  jobs: { name: string } | null;
 }
 
 interface RouteRow {
@@ -175,12 +177,50 @@ function toDeadlineSpec(
   return { time: raw.time, days };
 }
 const KINDS: readonly ParticipantKind[] = [
+  "job",
+  "project_job",
+  "department",
   "user",
+  "requester",
   "role",
   "project_role",
   "department_role",
-  "requester",
 ];
+
+/**
+ * أعمدة المشارك بحسب نوعه. القيد `participant_shape` في القاعدة يرفض
+ * الخلط، فيُفرَغ كل ما لا يخصّ النوع — وهذا المكان الوحيد الذي يعرف ذلك،
+ * يقرؤه الحفظ من المنشئ والحفظ من النافذة معًا.
+ */
+function participantColumns(
+  p: Pick<
+    SaveStageParticipantDto,
+    | "kind"
+    | "userId"
+    | "roleId"
+    | "departmentId"
+    | "jobId"
+    | "requiresSign"
+    | "isObserver"
+    | "isOptional"
+  >,
+) {
+  const inProject = p.kind === "project_role" || p.kind === "project_job";
+  return {
+    kind: p.kind,
+    user_id: p.kind === "user" ? p.userId : null,
+    role_id:
+      p.kind === "role" || p.kind === "project_role" || p.kind === "department_role"
+        ? p.roleId
+        : null,
+    department_id:
+      p.kind === "department" || p.kind === "department_role" ? p.departmentId : null,
+    job_id: p.kind === "job" || p.kind === "project_job" ? p.jobId : null,
+    is_optional: p.isObserver ? false : p.isOptional,
+    requires_sign: inProject && p.requiresSign,
+    is_observer: p.isObserver,
+  };
+}
 const ACTION_KINDS: readonly ActionKind[] = [
   "forward",
   "backward",
@@ -315,6 +355,8 @@ function toDto(row: DefinitionRow): WorkflowDefinitionDto {
             roleName: p.roles?.name ?? null,
             departmentId: p.department_id,
             departmentName: p.departments?.name ?? null,
+            jobId: p.job_id,
+            jobName: p.jobs?.name ?? null,
             isOptional: p.is_optional,
             requiresSign: p.requires_sign,
             isObserver: p.is_observer,
@@ -641,6 +683,7 @@ export class SupabaseWorkflowDefinitionRepository implements IWorkflowDefinition
                   roleId: s.roleId ?? null,
                   userId: s.userId ?? null,
                   departmentId: s.departmentId ?? null,
+                  jobId: s.jobId ?? null,
                   requiresSign: s.requiresSign ?? false,
                   isObserver: s.isObserver ?? false,
                   isOptional: s.isOptional ?? false,
@@ -650,26 +693,18 @@ export class SupabaseWorkflowDefinitionRepository implements IWorkflowDefinition
         for (let pIdx = 0; pIdx < participantsList.length; pIdx++) {
           const p = participantsList[pIdx];
           if (!p) continue;
-          const kind: ParticipantKind = p.kind ?? "requester";
-          const roleId = p.roleId ?? null;
-          const userId = p.userId ?? null;
-          const deptId = p.departmentId ?? null;
-          const requiresSign = p.requiresSign ?? false;
-          const isObserver = p.isObserver ?? false;
-          const isOptional = p.isOptional ?? false;
-
           const participantPayload = {
             stage_id: currentStageId,
-            kind,
-            user_id: kind === "user" ? userId : null,
-            role_id:
-              kind === "role" || kind === "project_role" || kind === "department_role"
-                ? roleId
-                : null,
-            department_id: kind === "department_role" ? deptId : null,
-            is_optional: isObserver ? false : isOptional,
-            requires_sign: kind === "project_role" ? requiresSign : false,
-            is_observer: isObserver,
+            ...participantColumns({
+              kind: p.kind ?? "requester",
+              userId: p.userId ?? null,
+              roleId: p.roleId ?? null,
+              departmentId: p.departmentId ?? null,
+              jobId: p.jobId ?? null,
+              requiresSign: p.requiresSign ?? false,
+              isObserver: p.isObserver ?? false,
+              isOptional: p.isOptional ?? false,
+            }),
             sort_order: pIdx + 1,
           };
 
@@ -991,21 +1026,9 @@ export class SupabaseWorkflowDefinitionRepository implements IWorkflowDefinition
     input: SaveStageParticipantDto,
   ): Promise<Result<void, DomainError>> {
     try {
-      // القيد `participant_shape` في القاعدة يرفض الخلط، فنُفرغ ما لا يخصّ النوع
       const payload = {
         stage_id: input.stageId,
-        kind: input.kind,
-        user_id: input.kind === "user" ? input.userId : null,
-        role_id:
-          input.kind === "role" ||
-          input.kind === "project_role" ||
-          input.kind === "department_role"
-            ? input.roleId
-            : null,
-        department_id: input.kind === "department_role" ? input.departmentId : null,
-        is_optional: input.isObserver ? false : input.isOptional,
-        requires_sign: input.kind === "project_role" ? input.requiresSign : false,
-        is_observer: input.isObserver,
+        ...participantColumns(input),
         sort_order: input.sortOrder,
       };
 

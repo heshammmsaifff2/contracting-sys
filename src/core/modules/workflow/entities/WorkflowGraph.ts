@@ -354,7 +354,10 @@ export function validateWorkflowGraph(
         (p) =>
           p.kind === "role" ||
           p.kind === "project_role" ||
-          p.kind === "department_role",
+          p.kind === "department_role" ||
+          p.kind === "job" ||
+          p.kind === "project_job" ||
+          p.kind === "department",
       );
       if (!expands && stage.quorumCount > countable) {
         add(

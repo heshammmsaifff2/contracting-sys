@@ -7,7 +7,6 @@ import { Select } from "@presentation/shared/ui/Select";
 import { FormField } from "@presentation/shared/ui/FormField";
 import { Modal } from "@presentation/shared/ui/Modal";
 import { errorMessage } from "@presentation/shared/lib/query";
-import { useProfiles } from "@presentation/features/identity/hooks/useIdentity";
 import { useAppSettings } from "@presentation/app/providers/settings-context";
 import { useCreateProject, useUpdateProject } from "../hooks/useProjects";
 import { t } from "@i18n/index";
@@ -33,7 +32,6 @@ export function ProjectFormModal({ isOpen, onClose, project }: ProjectFormModalP
   const isEditing = project !== null;
   const createProject = useCreateProject();
   const updateProject = useUpdateProject();
-  const profiles = useProfiles();
   const { currency } = useAppSettings();
 
   const [code, setCode] = useState(project?.code ?? "");
@@ -43,17 +41,8 @@ export function ProjectFormModal({ isOpen, onClose, project }: ProjectFormModalP
     String(project?.contractValue ?? 0),
   );
   const [receivedAt, setReceivedAt] = useState(project?.receivedAt ?? "");
-  const [managerId, setManagerId] = useState(project?.managerId ?? "");
-  const [extractsOfficerId, setExtractsOfficerId] = useState(
-    project?.extractsOfficerId ?? "",
-  );
   const [status, setStatus] = useState<ProjectStatus>(project?.status ?? "active");
   const [error, setError] = useState<string | null>(null);
-
-  const staffOptions = (profiles.data ?? []).map((profile) => ({
-    value: profile.id,
-    label: profile.fullName,
-  }));
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -65,8 +54,9 @@ export function ProjectFormModal({ isOpen, onClose, project }: ProjectFormModalP
       ownerEntity: ownerEntity.trim() === "" ? null : ownerEntity,
       contractValue: Number(contractValue),
       receivedAt: receivedAt === "" ? null : receivedAt,
-      managerId: managerId === "" ? null : managerId,
-      extractsOfficerId: extractsOfficerId === "" ? null : extractsOfficerId,
+      // الأشخاص يُسندون من «وظائف المشروع» لا من هنا — والحقلان القديمان يُحفظان كما هما
+      managerId: project?.managerId ?? null,
+      extractsOfficerId: project?.extractsOfficerId ?? null,
       status,
     };
 
@@ -170,30 +160,6 @@ export function ProjectFormModal({ isOpen, onClose, project }: ProjectFormModalP
               options={STATUS_OPTIONS}
               value={status}
               onChange={(e) => setStatus(e.target.value as ProjectStatus)}
-            />
-          )}
-        </FormField>
-
-        <FormField label={t.projects.manager}>
-          {(id) => (
-            <Select
-              id={id}
-              options={staffOptions}
-              placeholder={t.projects.none}
-              value={managerId}
-              onChange={(e) => setManagerId(e.target.value)}
-            />
-          )}
-        </FormField>
-
-        <FormField label={t.projects.extractsOfficer}>
-          {(id) => (
-            <Select
-              id={id}
-              options={staffOptions}
-              placeholder={t.projects.none}
-              value={extractsOfficerId}
-              onChange={(e) => setExtractsOfficerId(e.target.value)}
             />
           )}
         </FormField>

@@ -55,6 +55,7 @@ import { FormField } from "@presentation/shared/ui/FormField";
 import { Input } from "@presentation/shared/ui/Input";
 import { Modal } from "@presentation/shared/ui/Modal";
 import { Select } from "@presentation/shared/ui/Select";
+import { Combobox } from "@presentation/shared/ui/Combobox";
 import { errorMessage } from "@presentation/shared/lib/query";
 import {
   useProfiles,
@@ -63,10 +64,16 @@ import {
 import { useSavePipelineWorkflow, useWorkflowDefinitions } from "../hooks/useWorkflow";
 import {
   buildConditionFromItem,
+  builderKindOptions,
   createDefaultActionsForStage,
   definitionToPipelineStages,
   unrepresentableConditions,
 } from "./workflow-pipeline-helpers";
+import { useDepartments } from "@presentation/features/organization/hooks/useOrganization";
+import {
+  departmentOptions,
+  jobOptions,
+} from "@presentation/features/organization/lib/org-options";
 import { t } from "@i18n/index";
 
 export interface StageParticipantItem {
@@ -74,6 +81,8 @@ export interface StageParticipantItem {
   kind: ParticipantKind;
   roleId: string;
   userId: string;
+  jobId: string;
+  departmentId: string;
   requiresSign: boolean;
   isOptional: boolean;
   isObserver: boolean;
@@ -154,7 +163,7 @@ export interface PipelineStageItem {
   deadlineAction: DeadlineAction;
 }
 
-function createEmptyStage(index: number, defaultRoleId = ""): PipelineStageItem {
+function createEmptyStage(index: number): PipelineStageItem {
   return {
     id: `stage_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
     name: index === 0 ? "مرحلة البداية" : `المرحلة ${index + 1}`,
@@ -176,9 +185,11 @@ function createEmptyStage(index: number, defaultRoleId = ""): PipelineStageItem 
     participants: [
       {
         id: `p_${Date.now()}_1`,
-        kind: index === 0 ? "requester" : "project_role",
-        roleId: index === 0 ? "" : defaultRoleId,
+        kind: index === 0 ? "requester" : "project_job",
+        roleId: "",
         userId: "",
+        jobId: "",
+        departmentId: "",
         requiresSign: false,
         isOptional: false,
         isObserver: false,
@@ -221,6 +232,7 @@ export function WorkflowPipelineBuilder({
   const definitions = useWorkflowDefinitions();
   const roles = useRoles();
   const profiles = useProfiles();
+  const departments = useDepartments();
 
   // فارغان عند البناء: اسمٌ جاهز يُحفَظ كما هو سهوًا، ورمزُ النوع لا يتغيّر
   const [name, setName] = useState(editing?.name ?? "");
@@ -264,6 +276,8 @@ export function WorkflowPipelineBuilder({
                 kind: "requester",
                 roleId: "",
                 userId: "",
+                jobId: "",
+                departmentId: "",
                 requiresSign: false,
                 isOptional: false,
                 isObserver: false,
@@ -301,9 +315,11 @@ export function WorkflowPipelineBuilder({
             participants: [
               {
                 id: "p_2_1",
-                kind: "project_role",
+                kind: "project_job",
                 roleId: "",
                 userId: "",
+                jobId: "",
+                departmentId: "",
                 requiresSign: true,
                 isOptional: false,
                 isObserver: false,
@@ -341,9 +357,11 @@ export function WorkflowPipelineBuilder({
             participants: [
               {
                 id: "p_3_1",
-                kind: "role",
+                kind: "job",
                 roleId: "",
                 userId: "",
+                jobId: "",
+                departmentId: "",
                 requiresSign: false,
                 isOptional: false,
                 isObserver: false,
@@ -390,17 +408,15 @@ export function WorkflowPipelineBuilder({
 
   /** تفريغ النموذج للبدء من الصفر. */
   function resetBuilder() {
-    const pmId = roles.data?.find((r) => r.key === "project_manager")?.id ?? "";
     setName("");
     setTransactionType("");
-    setStages([createEmptyStage(0, pmId)]);
+    setStages([createEmptyStage(0)]);
     setError(null);
   }
 
   function handleAddStage(atIndex?: number) {
     const insertAt = atIndex !== undefined ? atIndex : stages.length;
-    const pmId = roles.data?.find((r) => r.key === "project_manager")?.id || "";
-    const newStage = createEmptyStage(insertAt, pmId);
+    const newStage = createEmptyStage(insertAt);
     const updated = [...stages];
     updated.splice(insertAt, 0, newStage);
     setStages(updated);
@@ -461,9 +477,11 @@ export function WorkflowPipelineBuilder({
     if (!stage) return;
     const newParticipant: StageParticipantItem = {
       id: `p_${Date.now()}_${stage.participants.length + 1}`,
-      kind: "project_role",
+      kind: "project_job",
       roleId: "",
       userId: "",
+      jobId: "",
+      departmentId: "",
       requiresSign: false,
       isOptional: false,
       isObserver: false,
@@ -590,6 +608,18 @@ export function WorkflowPipelineBuilder({
             );
             return;
           }
+        }
+        if ((p.kind === "job" || p.kind === "project_job") && p.jobId === "") {
+          setError(
+            `يرجى اختيار الوظيفة للمشارك رقم ${pIdx + 1} في المرحلة «${stageItem.name}»`,
+          );
+          return;
+        }
+        if (p.kind === "department" && p.departmentId === "") {
+          setError(
+            `يرجى اختيار القسم للمشارك رقم ${pIdx + 1} في المرحلة «${stageItem.name}»`,
+          );
+          return;
         }
       }
     }
@@ -731,11 +761,21 @@ export function WorkflowPipelineBuilder({
               return {
                 kind: p.kind,
                 roleId:
-                  p.kind === "role" || p.kind === "project_role"
+                  p.kind === "role" ||
+                  p.kind === "project_role" ||
+                  p.kind === "department_role"
                     ? effectiveRoleId || null
                     : null,
                 userId: p.kind === "user" ? p.userId || null : null,
-                requiresSign: p.kind === "project_role" && p.requiresSign,
+                jobId:
+                  p.kind === "job" || p.kind === "project_job" ? p.jobId || null : null,
+                departmentId:
+                  p.kind === "department" || p.kind === "department_role"
+                    ? p.departmentId || null
+                    : null,
+                requiresSign:
+                  (p.kind === "project_role" || p.kind === "project_job") &&
+                  p.requiresSign,
                 isOptional: p.isOptional,
                 isObserver: p.isObserver,
               };
@@ -1143,38 +1183,22 @@ export function WorkflowPipelineBuilder({
                                   kind: e.target.value as ParticipantKind,
                                 })
                               }
-                              options={[
-                                {
-                                  value: "requester",
-                                  label: "مقدّم الطلب (صاحب المعاملة)",
-                                },
-                                {
-                                  value: "project_role",
-                                  label: "دور في المشروع (مثل مدير المشروع)",
-                                },
-                                {
-                                  value: "role",
-                                  label: "دور عام في النظام (مثل المحاسب)",
-                                },
-                                { value: "user", label: "موظف محدد بالاسم" },
-                              ]}
+                              options={builderKindOptions(p.kind)}
                             />
 
-                            {(p.kind === "role" || p.kind === "project_role") && (
+                            {(p.kind === "role" ||
+                              p.kind === "project_role" ||
+                              p.kind === "department_role") && (
                               <div className="flex flex-col gap-1">
-                                <Select
+                                <Combobox
+                                  aria-label={t.workflowAdmin.role}
                                   value={resolveParticipantRoleId(p)}
-                                  onChange={(e) =>
-                                    updateParticipant(index, pIdx, {
-                                      roleId: e.target.value,
-                                    })
+                                  onChange={(next) =>
+                                    updateParticipant(index, pIdx, { roleId: next })
                                   }
-                                  placeholder="اختر الدور المطلوب..."
-                                  className={
-                                    !resolveParticipantRoleId(p)
-                                      ? "border-amber-500 ring-1 ring-amber-500/30"
-                                      : ""
-                                  }
+                                  placeholder={t.workflowAdmin.searchRole}
+                                  noMatchesText={t.common.noSearchMatches}
+                                  hasWarning={!resolveParticipantRoleId(p)}
                                   options={(roles.data ?? []).map((r) => ({
                                     value: r.id,
                                     label: r.name,
@@ -1188,26 +1212,67 @@ export function WorkflowPipelineBuilder({
                               </div>
                             )}
 
-                            {p.kind === "user" && (
+                            {(p.kind === "job" || p.kind === "project_job") && (
                               <div className="flex flex-col gap-1">
-                                <Select
-                                  value={p.userId}
-                                  onChange={(e) =>
+                                <Combobox
+                                  aria-label={t.workflowAdmin.jobField}
+                                  value={p.jobId}
+                                  onChange={(next) =>
+                                    updateParticipant(index, pIdx, { jobId: next })
+                                  }
+                                  placeholder={t.workflowAdmin.searchJob}
+                                  noMatchesText={t.common.noSearchMatches}
+                                  hasWarning={!p.jobId}
+                                  options={jobOptions(departments.data ?? [])}
+                                />
+                                <span className="text-content-muted text-[10px]">
+                                  {p.kind === "project_job"
+                                    ? "تصل لشاغل الوظيفة المُسنَد على مشروع المعاملة فقط"
+                                    : "تصل لكل شاغلي الوظيفة في الشركة"}
+                                </span>
+                              </div>
+                            )}
+
+                            {p.kind === "department" && (
+                              <div className="flex flex-col gap-1">
+                                <Combobox
+                                  aria-label={t.workflowAdmin.department}
+                                  value={p.departmentId}
+                                  onChange={(next) =>
                                     updateParticipant(index, pIdx, {
-                                      userId: e.target.value,
+                                      departmentId: next,
                                     })
                                   }
-                                  placeholder="اختر الموظف..."
-                                  className={
-                                    !p.userId
-                                      ? "border-amber-500 ring-1 ring-amber-500/30"
-                                      : ""
+                                  placeholder={t.workflowAdmin.searchDepartment}
+                                  noMatchesText={t.common.noSearchMatches}
+                                  hasWarning={!p.departmentId}
+                                  options={departmentOptions(departments.data ?? [])}
+                                />
+                                <span className="text-content-muted text-[10px]">
+                                  تصل لكل موظفي القسم
+                                </span>
+                              </div>
+                            )}
+
+                            {p.kind === "user" && (
+                              <div className="flex flex-col gap-1">
+                                <Combobox
+                                  aria-label={t.workflowAdmin.employee}
+                                  value={p.userId}
+                                  onChange={(next) =>
+                                    updateParticipant(index, pIdx, { userId: next })
                                   }
+                                  placeholder={t.workflowAdmin.searchEmployee}
+                                  noMatchesText={t.common.noSearchMatches}
+                                  hasWarning={!p.userId}
                                   options={(profiles.data ?? [])
                                     .filter((prof) => prof.isActive)
                                     .map((prof) => ({
                                       value: prof.id,
-                                      label: prof.fullName,
+                                      label:
+                                        prof.jobName === null
+                                          ? prof.fullName
+                                          : `${prof.fullName} — ${prof.jobName}`,
                                     }))}
                                 />
                                 {!p.userId && (
@@ -1219,7 +1284,8 @@ export function WorkflowPipelineBuilder({
                             )}
 
                             <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
-                              {p.kind === "project_role" && (
+                              {(p.kind === "project_role" ||
+                                p.kind === "project_job") && (
                                 <label className="text-content-muted flex cursor-pointer items-center gap-1.5">
                                   <input
                                     type="checkbox"

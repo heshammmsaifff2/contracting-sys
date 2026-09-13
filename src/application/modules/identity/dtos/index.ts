@@ -10,10 +10,18 @@ export interface ProfileDto {
   code: string | null;
   email: string | null;
   fullName: string;
+  /** مشتقّ من قسم الوظيفة — يُقرأ ولا يُكتب. */
   employeeType: EmployeeType;
   isActive: boolean;
   roleKeys: readonly string[];
   roleNames: readonly string[];
+  /** الوظيفة الواحدة — ومنها القسم والتصنيف والصلاحيات. */
+  jobId: string | null;
+  jobName: string | null;
+  departmentId: string | null;
+  departmentName: string | null;
+  /** أدوارٌ منحتها الوظيفة: تتبعها ولا تُسحب باليد. */
+  jobRoleKeys: readonly string[];
 }
 
 export interface PermissionDto {
@@ -36,14 +44,19 @@ export interface UpdateProfileInput {
   id: string;
   fullName: string;
   code: string | null;
-  employeeType: EmployeeType;
+  /**
+   * غيابه = لا تغيير. وتغييره يغيّر صلاحيات الموظف، فالقاعدة تشترط له
+   * صلاحية إسناد الأدوار — ولذلك لا يُرسَل إلا حين يتغيّر فعلًا.
+   */
+  jobId?: string | null;
 }
 
 export interface CreateUserInput {
   email: string;
   password: string;
   fullName: string;
-  employeeType: EmployeeType;
+  /** null = يُضاف بلا وظيفة (فبلا صلاحيات) حتى يُسندها من يملك إسناد الأدوار. */
+  jobId: string | null;
   code?: string | null;
   roleKeys?: readonly string[];
 }

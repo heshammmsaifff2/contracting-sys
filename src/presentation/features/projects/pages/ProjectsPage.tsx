@@ -7,11 +7,7 @@ import { Button } from "@presentation/shared/ui/Button";
 import { DataTable, type Column } from "@presentation/shared/ui/DataTable";
 import { EmptyState } from "@presentation/shared/ui/EmptyState";
 import { PermissionGate } from "@presentation/shared/ui/PermissionGate";
-import {
-  formatDate,
-  formatMoney,
-  formatNumber,
-} from "@presentation/shared/lib/formatters";
+import { formatDate, formatMoney } from "@presentation/shared/lib/formatters";
 import { errorMessage } from "@presentation/shared/lib/query";
 import { useAppSettings } from "@presentation/app/providers/settings-context";
 import { useAuth } from "@presentation/app/providers/auth-context";
@@ -82,17 +78,24 @@ export function ProjectsPage() {
       ),
     },
     {
-      key: "manager",
-      header: t.projects.manager,
-      render: (row) => (
-        <span className="text-content-muted text-sm">{row.managerName ?? "—"}</span>
-      ),
-    },
-    {
-      key: "assignees",
-      header: t.projects.assignees,
-      numeric: true,
-      render: (row) => formatNumber(row.assigneeCount),
+      // المشروع يُقرأ بوظائفه: «مدير مشروع: هاني» — والشاغرة تُلوَّن تنبيهًا
+      key: "jobs",
+      header: t.projects.jobs,
+      render: (row) =>
+        row.jobSlots.length === 0 ? (
+          <span className="text-content-muted text-xs">{t.projects.noAssignees}</span>
+        ) : (
+          <span className="flex max-w-xs flex-wrap gap-1">
+            {row.jobSlots.map((slot, i) => (
+              <Badge
+                key={`${slot.jobName}-${i}`}
+                tone={slot.holderName === null ? "warning" : "neutral"}
+              >
+                {slot.jobName}: {slot.holderName ?? t.projects.vacant}
+              </Badge>
+            ))}
+          </span>
+        ),
     },
     {
       key: "status",

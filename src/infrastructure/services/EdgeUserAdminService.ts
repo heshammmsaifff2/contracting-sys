@@ -22,7 +22,7 @@ export class EdgeUserAdminService implements IUserAdminService {
       email: input.email,
       password: input.password,
       fullName: input.fullName,
-      employeeType: input.employeeType,
+      jobId: input.jobId,
       code: input.code ?? null,
       roleKeys: input.roleKeys ?? [],
     });

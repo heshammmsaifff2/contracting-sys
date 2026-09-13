@@ -12,8 +12,16 @@ export interface ProjectDto {
   extractsOfficerId: string | null;
   extractsOfficerName: string | null;
   status: ProjectStatus;
-  /** عدد الموظفين المعتمدين على المشروع. */
+  /** عدد خانات الوظائف على المشروع. */
   assigneeCount: number;
+  /** الوظائف وشاغلوها — «مدير مشروع: هاني». */
+  jobSlots: readonly ProjectJobSlotDto[];
+}
+
+export interface ProjectJobSlotDto {
+  jobName: string;
+  /** null = شاغرة. */
+  holderName: string | null;
 }
 
 export interface CreateProjectDto {
@@ -31,11 +39,16 @@ export interface UpdateProjectDto extends CreateProjectDto {
   id: string;
 }
 
+/** خانة وظيفة على المشروع يملؤها أحد شاغلي الوظيفة. */
 export interface ProjectAssignmentDto {
   id: string;
   projectId: string;
-  userId: string;
-  userName: string;
+  jobId: string;
+  jobName: string;
+  departmentName: string | null;
+  /** null = شاغرة. */
+  userId: string | null;
+  userName: string | null;
   userCode: string | null;
   canSign: boolean;
 }
@@ -51,6 +64,8 @@ export interface ProjectMemberDto {
 
 export interface AssignUserToProjectDto {
   projectId: string;
-  userId: string;
+  jobId: string;
+  /** null = تُضاف شاغرة ويُختار شاغلها لاحقًا. */
+  userId: string | null;
   canSign: boolean;
 }

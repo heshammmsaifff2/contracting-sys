@@ -38,6 +38,7 @@ import {
   UserCog,
   Settings,
   PieChart,
+  Network,
   // Stethoscope,
 } from "lucide-react";
 import { t } from "@i18n/index";
@@ -96,6 +97,13 @@ export const NAV_GROUPS = [
         icon: ShieldCheck,
         phase: 1,
         permission: "role.read",
+      },
+      {
+        to: "/organization",
+        label: t.nav.organization,
+        icon: Network,
+        phase: 1,
+        permission: "org.manage",
       },
     ],
   },

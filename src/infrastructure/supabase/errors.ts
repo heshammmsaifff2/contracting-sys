@@ -73,6 +73,15 @@ export function toDomainDbError(
           "رمز المرحلة مكرر داخل هذا المسار — يجب أن يكون لكل مرحلة رمز إنجليزي فريد";
       } else if (fullMsg.includes("workflow_definitions_one_published_idx")) {
         msg = "يوجد مسار منشور ومفعّل بالفعل لهذا النوع من المعاملات";
+      } else if (fullMsg.includes("departments_name_key")) {
+        msg = "يوجد قسم بهذا الاسم — اسم القسم يجب أن يكون فريدًا";
+      } else if (fullMsg.includes("jobs_department_id_name_key")) {
+        msg = "توجد وظيفة بهذا الاسم في القسم نفسه";
+      } else if (
+        fullMsg.includes("daa_user_uniq") ||
+        fullMsg.includes("daa_dept_uniq")
+      ) {
+        msg = "الاستثناء مكرّر في قائمة القسم";
       }
       return new ConflictError(spoken(error, msg), {
         entity: context.entity,
@@ -91,7 +100,7 @@ export function toDomainDbError(
       const full = `${error.message ?? ""} ${error.details ?? ""}`;
       if (full.includes("participant_shape")) {
         checkMsg =
-          "بيانات المشارك غير مكتملة — يجب اختيار الدور أو الموظف المطلوب للمشارك";
+          "بيانات المشارك غير مكتملة — اختر الوظيفة أو القسم أو الموظف المطلوب للمشارك";
       } else if (full.includes("workflow_definitions_active_only_published")) {
         checkMsg = "لا يمكن تفعيل مسار غير منشور";
       }

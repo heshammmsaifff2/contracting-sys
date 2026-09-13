@@ -13,7 +13,7 @@ function makeUser(options: {
   const profile = Profile.create({
     id: "22222222-2222-2222-2222-222222222222",
     fullName: "مهندس الاختبار",
-    employeeType: "engineer",
+    employeeType: "operational",
     isActive: options.isActive ?? true,
   });
   if (!profile.ok) throw new Error("setup failed");

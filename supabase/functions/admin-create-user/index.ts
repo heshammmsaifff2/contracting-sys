@@ -7,27 +7,28 @@
  *   1) الطالب مسجّل الدخول.
  *   2) الطالب يملك صلاحية user.create — تُقرأ بدالة has_permission نفسها
  *      التي تستخدمها سياسات RLS، فلا يوجد مسار جانبي يتجاوزها.
+ *   3) الوظيفة والأدوار تمنح صلاحيات، فإسنادها عند الإنشاء يتطلّب
+ *      user.assign_role كما يتطلّبه تغييرها بعده.
  *
- * الطلب : { email, password, fullName, employeeType, code?, roleKeys? }
+ * التصنيف والقسم لا يُرسَلان: يُشتقّان من الوظيفة بمُشغّل القاعدة.
+ *
+ * الطلب : { email, password, fullName, jobId?, code?, roleKeys? }
  * الردّ  : { userId }
  */
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders, errorResponse, jsonResponse } from "../_shared/cors.ts";
 
-// «worker» أُضيف في المرحلة 7: العامل ملف كسائر الموظفين ليعمل حسابه في الخدمة الذاتية
-const EMPLOYEE_TYPES = ["admin", "engineer", "supervisor", "worker"] as const;
-type EmployeeType = (typeof EMPLOYEE_TYPES)[number];
-
 interface CreateUserBody {
   email?: unknown;
   password?: unknown;
   fullName?: unknown;
-  employeeType?: unknown;
+  jobId?: unknown;
   code?: unknown;
   roleKeys?: unknown;
 }
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MIN_PASSWORD_LENGTH = 8;
 
 Deno.serve(async (req: Request) => {
@@ -81,7 +82,7 @@ Deno.serve(async (req: Request) => {
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
   const password = typeof body.password === "string" ? body.password : "";
   const fullName = typeof body.fullName === "string" ? body.fullName.trim() : "";
-  const employeeType = body.employeeType;
+  const jobId = typeof body.jobId === "string" && body.jobId !== "" ? body.jobId : null;
   const code = typeof body.code === "string" && body.code !== "" ? body.code : null;
   const roleKeys = Array.isArray(body.roleKeys)
     ? body.roleKeys.filter((key): key is string => typeof key === "string")
@@ -96,8 +97,24 @@ Deno.serve(async (req: Request) => {
   if (fullName.length < 2) {
     return errorResponse("اسم الموظف مطلوب", 400);
   }
-  if (!EMPLOYEE_TYPES.includes(employeeType as EmployeeType)) {
-    return errorResponse("تصنيف الموظف غير صالح", 400);
+  if (jobId !== null && !UUID_PATTERN.test(jobId)) {
+    return errorResponse("الوظيفة غير صالحة", 400);
+  }
+
+  if (jobId !== null || roleKeys.length > 0) {
+    const { data: canAssign, error: assignError } = await callerClient.rpc(
+      "has_permission",
+      { permission_key: "user.assign_role" },
+    );
+    if (assignError) {
+      return errorResponse("تعذّر التحقّق من الصلاحية", 500);
+    }
+    if (canAssign !== true) {
+      return errorResponse(
+        "إسناد الوظيفة يمنح صلاحياتها — يتطلّب صلاحية إسناد الأدوار. أضِف الموظف بلا وظيفة",
+        403,
+      );
+    }
   }
 
   // عميل بصلاحيات كاملة — لا يُنشأ إلا بعد اجتياز فحص الصلاحية أعلاه
@@ -105,12 +122,30 @@ Deno.serve(async (req: Request) => {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
+  if (jobId !== null) {
+    const { data: job, error: jobError } = await adminClient
+      .from("jobs")
+      .select("id")
+      .eq("id", jobId)
+      .maybeSingle();
+    if (jobError) {
+      return errorResponse("تعذّر التحقّق من الوظيفة", 500);
+    }
+    if (!job) {
+      return errorResponse("الوظيفة غير موجودة", 400);
+    }
+  }
+
   const { data: created, error: createError } = await adminClient.auth.admin.createUser(
     {
       email,
       password,
       email_confirm: true,
-      user_metadata: { full_name: fullName, employee_type: employeeType },
+      // handle_new_user يقرأ job_id فيشتقّ القسم والتصنيف ويمنح دور الوظيفة
+      user_metadata: {
+        full_name: fullName,
+        ...(jobId === null ? {} : { job_id: jobId }),
+      },
     },
   );
 
@@ -148,12 +183,14 @@ Deno.serve(async (req: Request) => {
       .in("key", roleKeys);
 
     if (roles && roles.length > 0) {
-      await adminClient.from("user_roles").insert(
+      // دور الوظيفة قد يكون بينها — فالمكرّر يُتجاوز ولا يُسقط الطلب
+      await adminClient.from("user_roles").upsert(
         roles.map((role: { id: string }) => ({
           user_id: userId,
           role_id: role.id,
           created_by: caller.user.id,
         })),
+        { onConflict: "user_id,role_id", ignoreDuplicates: true },
       );
     }
   }
